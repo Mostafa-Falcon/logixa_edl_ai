@@ -323,24 +323,37 @@ class AppStrings {
 
   static const String chatPageTitle = 'الشات المحلي';
   static const String chatPageSubtitle =
-      'واجهة شات مبدئية. حالة Rust Engine وتشغيله من الشريط العلوي فقط.';
+      'واجهة الشات الحقيقية مع Rust Runtime و llama-server باستخدام البروفايل النشط فقط.';
   static const String chatWelcomeMessage =
-      'الشات جاهز كبداية حقيقية. اكتب رسالة، وسيتم إرسالها إلى Rust /runtime/chat باستخدام البروفايل النشط من الإعدادات فقط، وسيتم حفظ المحادثة تلقائيًا في Rust Memory بدون تشغيل GGUF فعليًا في هذه الخطوة.';
+      'الشات متصل بـ Rust /runtime/chat. الرد يظهر من GGUF الحقيقي عند توفر llama-server والبروفايل النشط، وبدون أي System Prompt افتراضي مخفي.';
   static const String chatProfileSelectorTitle = 'اختيار بروفايل التشغيل';
   static const String chatProfileSelectorDescription =
       'استخدم البروفايل النشط أو اختار بروفايل يدويًا قبل إرسال الرسالة.';
   static const String chatActiveProfileLabel = 'البروفايل المستخدم';
   static const String chatRuntimeNoteLabel = 'ملاحظة التشغيل';
   static const String chatRuntimeNote =
-      'تشغيل lifecycle فقط، بدون llama.cpp وبدون Streaming.';
+      'تشغيل GGUF عبر llama-server بنمط non-streaming، مع تفريغ الموديل بعد الرد حسب سياسة البروفايل.';
   static const String chatNoGgufNotice =
-      'Step 14 لا يشغل أي موديل GGUF حقيقي. الربط الحالي يختبر دورة Runtime فقط.';
+      'لا يوجد System Prompt افتراضي. أي Prompt يتم تطبيقه لازم يكون محفوظًا صراحة من الإعدادات.';
   static const String chatInputHint = 'اكتب رسالتك هنا...';
   static const String chatSendButton = 'إرسال';
+  static const String chatStopGenerationButton = 'إيقاف';
+  static const String chatStreamingPlaceholder = 'جاري استقبال الرد...';
   static const String chatSendingStatus = 'جاري الإرسال';
   static const String chatMemorySaveWarning =
       'تنبيه: تعذر حفظ جزء من المحادثة في Rust Memory.';
   static const String chatMemorySavedStatus = 'تم حفظ المحادثة في Rust Memory';
+  static const String chatConversationToolsTitle =
+      'أدوات مراجعة المحادثة الحالية';
+  static const String chatCopyConversationButton = 'نسخ المحادثة';
+  static const String chatConversationExportTitle =
+      'Logixa EDL AI Chat Conversation Export';
+  static const String chatCopyConversationCopiedTitle = 'تم نسخ المحادثة';
+  static const String chatCopyConversationCopiedMessage =
+      'الصقها في الشات عشان أراجع ردود الموديل معاك.';
+  static const String chatCopyConversationEmptyTitle = 'لا توجد محادثة';
+  static const String chatCopyConversationEmptyMessage =
+      'اكتب رسالة للموديل الأول، وبعدها انسخ المحادثة.';
 
   static const String workspaceBottomPanelTerminal = 'Terminal';
   static const String workspaceBottomPanelLogs = 'Logs';

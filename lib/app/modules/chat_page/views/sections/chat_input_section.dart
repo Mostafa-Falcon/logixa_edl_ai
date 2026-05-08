@@ -63,6 +63,15 @@ class ChatInputSection extends GetView<ChatPageController> {
           ),
           SizedBox(width: AppSizes.md.w),
           Obx(() {
+            if (controller.isStreaming.value) {
+              return ReusableButton(
+                title: AppStrings.chatStopGenerationButton,
+                icon: Icons.stop_rounded,
+                onPressed: controller.stopGeneration,
+                height: 52,
+              );
+            }
+
             return ReusableButton(
               title: AppStrings.chatSendButton,
               icon: Icons.send_rounded,

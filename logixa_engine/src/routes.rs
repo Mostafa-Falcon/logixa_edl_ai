@@ -10,7 +10,10 @@ use crate::{
 };
 use axum::{
     extract::{Query, State},
-    response::IntoResponse,
+    response::{
+        sse::{KeepAlive, Sse},
+        IntoResponse,
+    },
     routing::{get, post},
     Json, Router,
 };
@@ -104,6 +107,8 @@ pub fn router(state: EngineState) -> Router {
         .route("/runtime/system-prompt", post(set_runtime_system_prompt))
         .route("/runtime/profile", post(set_runtime_profile))
         .route("/runtime/chat", post(runtime_chat))
+        .route("/runtime/chat/stream", post(runtime_chat_stream))
+        .route("/runtime/stop-generation", post(runtime_stop_generation))
         .route("/runtime/unload", post(runtime_unload))
         .route("/memory/status", get(memory_status))
         .route(
@@ -262,6 +267,23 @@ async fn runtime_chat(
     let config = state.config.read().await.clone();
     let response: RuntimeChatResponse = state.runtime.prepare_chat(&config, payload).await;
     Json(response)
+}
+
+async fn runtime_chat_stream(
+    State(state): State<EngineState>,
+    Json(payload): Json<RuntimeChatRequest>,
+) -> Sse<crate::runtime::RuntimeSseStream> {
+    let config = state.config.read().await.clone();
+    let stream = state.runtime.prepare_chat_stream(config, payload).await;
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+async fn runtime_stop_generation(State(state): State<EngineState>) -> impl IntoResponse {
+    let runtime = state.runtime.stop_generation().await;
+    Json(RuntimeUnloadResponse {
+        unloaded: true,
+        runtime,
+    })
 }
 
 async fn runtime_unload(State(state): State<EngineState>) -> impl IntoResponse {

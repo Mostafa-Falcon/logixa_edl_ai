@@ -2647,3 +2647,164 @@ curl -i -X POST http://127.0.0.1:8787/runtime/chat \
 - إيقاف أي Engine قديم على port 8787 ثم تشغيل `cargo run` من جديد.
 - اختبار `/runtime/chat` والتأكد أن `system_prompt_applied=false` عندما يكون prompt فارغًا.
 
+
+## Step 24 — Runtime Chat Response UX
+
+### الهدف
+تثبيت تجربة الشات بعد نجاح تشغيل GGUF الحقيقي عبر `llama-server`، بحيث تعرض الواجهة رد الموديل الفعلي بدل رسائل lifecycle القديمة، وتتعامل مع أخطاء Runtime بشكل واضح، وبدون أي System Prompt افتراضي أو مخفي.
+
+### ما تم تنفيذه
+- تحديث Parser الخاص بـ `/runtime/chat` داخل `EngineRuntimeChatResult` لقراءة الحقول الفعلية الجديدة:
+  - `accepted`
+  - `generated_text`
+  - `model_started`
+  - `model_stopped_after_response`
+  - `model_loaded`
+  - `server_url`
+- جعل رسالة الشات تعرض `generated_text` مباشرة عند نجاح الاستجابة.
+- جعل أخطاء Runtime تظهر كنص واضح بدل اعتبار `accepted=false` نجاحًا بسبب fallback قديم.
+- إطالة timeout الخاص بطلب `/runtime/chat` فقط إلى 5 دقائق، لأن تحميل GGUF والتوليد المحلي قد يأخذ وقتًا أطول من طلبات status العادية.
+- تحديث نصوص صفحة الشات لإزالة عبارات `lifecycle فقط` و `بدون GGUF` بعد نجاح Step 23.
+- تحديث metadata المحادثة لتوضيح أن مصدر الرد هو `rust_llama_server_adapter`.
+
+### الملفات المعدلة
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/chat_page/controllers/chat_page_controller.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم إضافة Streaming.
+- لم يتم إضافة UI جديد.
+- لم يتم تغيير إعدادات الموديل تلقائيًا.
+- لم يتم إضافة System Prompt افتراضي.
+- لم يتم تعديل Rust Engine.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب
+1. شغّل Rust Engine بعد ضبط `LOGIXA_LLAMA_SERVER_BIN`.
+2. افتح صفحة الشات.
+3. أرسل رسالة قصيرة.
+4. تأكد أن رسالة المساعد تعرض رد GGUF فقط، وليس نص `llama-server response completed`.
+5. تأكد أن `system_prompt_applied=false` عندما لا يوجد System Prompt محفوظ.
+6. جرّب إيقاف Engine وتأكد أن رسالة الخطأ تظهر بوضوح في الشات.
+
+### الحالة
+بانتظار فحص مصطفى ونتيجة `flutter analyze` قبل اعتماد Step 24.
+
+---
+
+## Step 24 Fix — System Prompt Text Input
+
+### الهدف
+إصلاح حقل السيستم برومبت في صفحة الإعدادات بعد اكتشاف أن الكتابة العربية لا تظهر داخل الحقل.
+
+### سبب المشكلة
+`ReusableSettingsTextField` كان يحدد الحقول الرقمية عن طريق `keyboardType.toString()` والبحث عن كلمة `decimal`.
+هذا جعل `TextInputType.multiline` يُعامل كحقل رقمي لأن تمثيله النصي يحتوي على `decimal: null`، فتم تطبيق `FilteringTextInputFormatter` ومنع أي حروف عربية/إنجليزية.
+
+### ما تغيّر
+- تعديل `lib/app/widgets/reusable_widgets/reusable_settings_text_field.dart`.
+- جعل الفلترة الرقمية تعمل فقط مع:
+  - `TextInputType.number`
+  - `TextInputType.numberWithOptions(decimal: true)`
+- ترك `TextInputType.multiline` بدون input formatter.
+
+### الملفات المتغيرة
+- `lib/app/widgets/reusable_widgets/reusable_settings_text_field.dart`
+- `did.md`
+
+### الفحوصات المطلوبة
+- `flutter analyze`
+- `flutter run -d linux`
+- تجربة كتابة سيستم برومبت عربي داخل الإعدادات.
+- حفظ السيستم برومبت والتأكد أنه يظهر في رد `/runtime/chat` فقط عند حفظه يدويًا.
+
+### ملاحظات
+لا يوجد تعديل على Rust، ولا يوجد System Prompt افتراضي، ولا يوجد تغيير في تشغيل GGUF.
+
+
+## Step 24 Fix — Chat Conversation Copy Export
+
+### الهدف
+إضافة إمكانية نسخ المحادثة الحالية بين المستخدم والموديل من واجهة الشات، حتى يمكن لصقها للمراجعة بدون فتح ملفات الذاكرة أو SQLite.
+
+### ما تم
+- إضافة زر `نسخ المحادثة` أعلى قائمة رسائل الشات.
+- إضافة export نصي منظم يحتوي على رسائل المستخدم والمساعد وحالة runtime والبروفايل النشط.
+- استبعاد رسالة الترحيب الافتراضية من النسخة المنسوخة.
+- عدم نسخ محتوى System Prompt نفسه؛ يتم نسخ حالة وجوده وعدد حروفه فقط لتجنب تسريب نصوص غير مقصودة.
+- استخدام Clipboard من Flutter بدون أي تغيير في Rust أو llama-server أو إعدادات الموديل.
+
+### الملفات التي تغيّرت
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/chat_page/controllers/chat_page_controller.dart`
+- `lib/app/modules/chat_page/views/sections/chat_messages_section.dart`
+
+### الفحوصات المطلوبة
+- `flutter analyze`
+- `flutter run -d linux`
+- إرسال رسالتين في الشات ثم الضغط على `نسخ المحادثة` ولصق الناتج في أي محرر للتأكد من اكتماله.
+
+### مؤجل
+- تصدير المحادثة إلى ملف Markdown أو JSONL لاحقًا إذا احتجنا.
+
+## Step 23 — Streaming Response
+
+### الهدف
+تنفيذ الخطوة الرسمية من `todo.md`: جعل رد الشات يظهر تدريجيًا بدل انتظار الرد الكامل.
+
+### ما تغير
+- إضافة Rust SSE endpoint:
+  - `POST /runtime/chat/stream`
+- إضافة endpoint لإيقاف التوليد:
+  - `POST /runtime/stop-generation`
+- استخدام `stream=true` عند الاتصال الداخلي بـ `llama-server` عبر OpenAI-compatible chat completions.
+- استقبال Flutter للـ SSE tokens وتحديث رسالة المساعد تدريجيًا في الشات.
+- إضافة زر إيقاف أثناء التوليد.
+- حفظ الرسالة النهائية فقط في Rust Memory بعد اكتمال الرد بنجاح.
+
+### الحدود
+- لا يوجد WebSocket في هذه الخطوة.
+- لا يوجد Model Router 4B/12B.
+- لا يوجد Extensions work.
+- لا يوجد System Prompt افتراضي أو مخفي.
+
+### الاختبارات المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo fmt && cargo check`
+- تشغيل Rust Engine مع `LOGIXA_LLAMA_SERVER_BIN` مضبوط.
+- إرسال رسالة من الشات والتأكد أن الرد يظهر تدريجيًا.
+- تجربة زر إيقاف أثناء التوليد.
+
+
+
+## Step 23 Fix — Streaming Compile Issues
+
+### الهدف
+إصلاح أخطاء بناء Step 23 Streaming فقط بدون توسيع النطاق.
+
+### ما تم
+- إصلاح decoding في Flutter stream بحيث يتم تحويل `Stream<Uint8List>` إلى `Stream<List<int>>` قبل `utf8.decoder`.
+- تفعيل feature `stream` في `reqwest` حتى يدعم `Response::bytes_stream()` داخل Rust runtime.
+
+### الملفات المتغيرة
+- `lib/app/data/services/engine_client_service.dart`
+- `logixa_engine/Cargo.toml`
+- `did.md`
+
+### الفحوصات المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo check`
+
+### ملاحظات
+- لا يوجد تغيير في prompt defaults.
+- لا يوجد تغيير في model router.
+- لا يوجد تغيير في Extensions.

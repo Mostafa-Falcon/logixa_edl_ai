@@ -1,19 +1,26 @@
 use crate::{config::EngineConfig, model_profile::ModelProfileConfig};
+use axum::response::sse::Event;
+use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
+    convert::Infallible,
     env,
     path::Path,
     process::Stdio,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     process::{Child, Command},
-    sync::{Mutex, RwLock},
+    sync::{mpsc, Mutex, RwLock},
     time::{sleep, Duration, Instant},
 };
+use tokio_stream::wrappers::ReceiverStream;
 
 const DEFAULT_LLAMA_SERVER_BIN: &str = "llama-server";
 const DEFAULT_LLAMA_SERVER_HOST: &str = "127.0.0.1";
@@ -58,6 +65,7 @@ pub struct RuntimeSnapshot {
 pub struct RuntimeManager {
     state: Arc<RwLock<RuntimeSnapshot>>,
     llama_server_child: Arc<Mutex<Option<Child>>>,
+    stop_requested: Arc<AtomicBool>,
     client: Client,
     server_url: String,
 }
@@ -71,6 +79,7 @@ impl Default for RuntimeManager {
                 ..RuntimeSnapshot::default()
             })),
             llama_server_child: Arc::new(Mutex::new(None)),
+            stop_requested: Arc::new(AtomicBool::new(false)),
             client: Client::builder()
                 .timeout(Duration::from_secs(120))
                 .build()
@@ -104,6 +113,8 @@ pub struct RuntimeChatResponse {
     pub system_prompt_preview: Option<String>,
     pub server_url: Option<String>,
 }
+
+pub type RuntimeSseStream = ReceiverStream<Result<Event, Infallible>>;
 
 impl RuntimeManager {
     pub async fn snapshot(&self) -> RuntimeSnapshot {
@@ -404,6 +415,358 @@ impl RuntimeManager {
         extract_generated_text(&value).ok_or_else(|| format!("missing_generated_text: {value}"))
     }
 
+    pub async fn prepare_chat_stream(
+        &self,
+        config: EngineConfig,
+        payload: RuntimeChatRequest,
+    ) -> RuntimeSseStream {
+        let (sender, receiver) = mpsc::channel(128);
+        let runtime = self.clone();
+        tokio::spawn(async move {
+            runtime.run_chat_stream(config, payload, sender).await;
+        });
+        ReceiverStream::new(receiver)
+    }
+
+    pub async fn stop_generation(&self) -> RuntimeSnapshot {
+        self.stop_requested.store(true, Ordering::SeqCst);
+        let _ = self.stop_llama_server().await;
+        self.update_state(|state| {
+            state.stage = RuntimeStage::Stopped;
+            state.model_loaded = false;
+            state.last_event = Some("generation_stopped_by_user".to_string());
+            state.last_error = None;
+            state.server_url = Some(self.server_url.clone());
+        })
+        .await
+    }
+
+    async fn run_chat_stream(
+        &self,
+        config: EngineConfig,
+        payload: RuntimeChatRequest,
+        sender: mpsc::Sender<Result<Event, Infallible>>,
+    ) {
+        self.stop_requested.store(false, Ordering::SeqCst);
+
+        let prompt = payload.prompt.trim().to_string();
+        let profile = match self.resolve_profile(&config, payload.model_profile) {
+            Ok(profile) => profile,
+            Err(message) => {
+                let response = self.reject(message).await;
+                send_stream_event(&sender, "error", json!(response)).await;
+                return;
+            }
+        };
+
+        if !config.local_model_enabled {
+            let response = self.reject("local_model_disabled".to_string()).await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if !config.auto_start_on_message {
+            let response = self
+                .reject("auto_start_on_message_disabled".to_string())
+                .await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if prompt.is_empty() {
+            let response = self.reject("empty_prompt".to_string()).await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if !profile.has_model_path() {
+            let response = self
+                .reject_for_profile(profile.id.clone(), "missing_model_path".to_string())
+                .await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if !Path::new(&profile.model_path).is_absolute() {
+            let response = self
+                .reject_for_profile(
+                    profile.id.clone(),
+                    format!("model_path_must_be_absolute: {}", profile.model_path),
+                )
+                .await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if is_temporarily_blocked_12b_path(&profile.model_path) {
+            let response = self
+                .reject_for_profile(
+                    profile.id.clone(),
+                    "model_temporarily_blocked_12b_use_4b_first".to_string(),
+                )
+                .await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if !Path::new(&profile.model_path).is_file() {
+            let response = self
+                .reject_for_profile(
+                    profile.id.clone(),
+                    format!("model_path_not_found: {}", profile.model_path),
+                )
+                .await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if let Err(message) = validate_llama_server_bin() {
+            let response = self.reject_for_profile(profile.id.clone(), message).await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        let system_prompt = resolve_system_prompt(&config, payload.system_prompt);
+        let system_prompt_chars = system_prompt
+            .as_deref()
+            .map(|value| value.chars().count())
+            .unwrap_or_default();
+        let system_prompt_preview = system_prompt
+            .as_deref()
+            .map(|value| preview_text(value, 160))
+            .filter(|value| !value.is_empty());
+        let system_prompt_applied = system_prompt_chars > 0;
+
+        self.update_state(|state| {
+            state.stage = RuntimeStage::Starting;
+            state.model_loaded = false;
+            state.active_model_profile_id = Some(profile.id.clone());
+            state.total_requests = state.total_requests.saturating_add(1);
+            state.last_event = Some("stream_starting_llama_server".to_string());
+            state.last_error = None;
+            state.last_request_epoch_seconds = Some(now_epoch_seconds());
+            state.last_system_prompt_chars = system_prompt_chars;
+            state.last_system_prompt_preview = system_prompt_preview.clone();
+            state.server_url = Some(self.server_url.clone());
+        })
+        .await;
+
+        send_stream_event(
+            &sender,
+            "status",
+            json!({
+                "stage": "starting",
+                "message": "starting_llama_server",
+                "active_model_profile_id": profile.id,
+                "server_url": self.server_url,
+                "system_prompt_applied": system_prompt_applied,
+                "system_prompt_chars": system_prompt_chars,
+                "system_prompt_preview": system_prompt_preview,
+            }),
+        )
+        .await;
+
+        let model_started = match self.ensure_llama_server_ready(&profile).await {
+            Ok(started) => started,
+            Err(message) => {
+                let response = self
+                    .fail(
+                        profile.id.clone(),
+                        message,
+                        system_prompt_applied,
+                        system_prompt_chars,
+                        system_prompt_preview.clone(),
+                    )
+                    .await;
+                send_stream_event(&sender, "error", json!(response)).await;
+                return;
+            }
+        };
+
+        self.update_state(|state| {
+            state.stage = RuntimeStage::Generating;
+            state.model_loaded = true;
+            state.last_event = Some("stream_generating".to_string());
+            state.last_error = None;
+        })
+        .await;
+
+        send_stream_event(
+            &sender,
+            "status",
+            json!({
+                "stage": "generating",
+                "message": "stream_generation_started",
+                "model_started": model_started,
+                "active_model_profile_id": profile.id,
+                "server_url": self.server_url,
+            }),
+        )
+        .await;
+
+        let generated_text = match self
+            .send_chat_completion_stream(&profile, system_prompt.as_deref(), &prompt, &sender)
+            .await
+        {
+            Ok(text) => text,
+            Err(message) => {
+                let response = self
+                    .fail(
+                        profile.id.clone(),
+                        message,
+                        system_prompt_applied,
+                        system_prompt_chars,
+                        system_prompt_preview.clone(),
+                    )
+                    .await;
+                send_stream_event(&sender, "error", json!(response)).await;
+                return;
+            }
+        };
+
+        let mut stopped_after_response = false;
+        if config.unload_after_response && !config.keep_model_loaded {
+            stopped_after_response = true;
+            let _ = self.stop_llama_server().await;
+        }
+
+        let snapshot = self
+            .update_state(|state| {
+                state.stage = RuntimeStage::Completed;
+                state.model_loaded = !stopped_after_response;
+                state.active_model_profile_id = Some(profile.id.clone());
+                state.last_event = Some(if stopped_after_response {
+                    "stream_completed_and_unloaded".to_string()
+                } else {
+                    "stream_completed_keep_loaded".to_string()
+                });
+                state.last_error = None;
+                state.server_url = Some(self.server_url.clone());
+            })
+            .await;
+
+        let response = RuntimeChatResponse {
+            accepted: true,
+            model_started,
+            model_stopped_after_response: stopped_after_response,
+            model_loaded: snapshot.model_loaded,
+            stage: snapshot.stage,
+            active_model_profile_id: snapshot.active_model_profile_id,
+            generated_text: Some(generated_text),
+            message: if stopped_after_response {
+                "llama-server streaming response completed and runtime unloaded".to_string()
+            } else {
+                "llama-server streaming response completed and runtime kept loaded".to_string()
+            },
+            system_prompt_applied,
+            system_prompt_chars,
+            system_prompt_preview,
+            server_url: Some(self.server_url.clone()),
+        };
+        send_stream_event(&sender, "done", json!(response)).await;
+    }
+
+    async fn send_chat_completion_stream(
+        &self,
+        profile: &ModelProfileConfig,
+        system_prompt: Option<&str>,
+        user_prompt: &str,
+        sender: &mpsc::Sender<Result<Event, Infallible>>,
+    ) -> Result<String, String> {
+        let mut messages = Vec::new();
+        if let Some(system_prompt) = system_prompt {
+            messages.push(json!({"role": "system", "content": system_prompt}));
+        }
+        messages.push(json!({"role": "user", "content": user_prompt}));
+
+        let body = json!({
+            "model": profile.id,
+            "stream": true,
+            "max_tokens": profile.max_tokens,
+            "temperature": profile.temperature,
+            "top_p": profile.top_p,
+            "messages": messages
+        });
+
+        let response = self
+            .client
+            .post(format!("{}/v1/chat/completions", self.server_url))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|error| format!("stream_request_timeout_or_connection_error: {error}"))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|error| format!("failed_to_read_error_body: {error}"));
+            return Err(format!(
+                "llama_server_stream_http_{}: {text}",
+                status.as_u16()
+            ));
+        }
+
+        let mut full_text = String::new();
+        let mut line_buffer = String::new();
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            if self.stop_requested.load(Ordering::SeqCst) {
+                return Err("generation_stopped_by_user".to_string());
+            }
+
+            let chunk = chunk.map_err(|error| format!("stream_read_error: {error}"))?;
+            line_buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+            while let Some(newline_index) = line_buffer.find('\n') {
+                let raw_line = line_buffer[..newline_index]
+                    .trim_end_matches('\r')
+                    .trim()
+                    .to_string();
+                line_buffer = line_buffer[newline_index + 1..].to_string();
+
+                if raw_line.is_empty() || raw_line.starts_with(':') {
+                    continue;
+                }
+
+                let Some(data) = raw_line.strip_prefix("data:") else {
+                    continue;
+                };
+                let data = data.trim();
+                if data == "[DONE]" {
+                    return Ok(full_text.trim().to_string());
+                }
+
+                let value: Value = match serde_json::from_str(data) {
+                    Ok(value) => value,
+                    Err(_) => continue,
+                };
+
+                if let Some(delta) = extract_stream_delta(&value) {
+                    if delta.is_empty() {
+                        continue;
+                    }
+                    full_text.push_str(&delta);
+                    send_stream_event(
+                        sender,
+                        "token",
+                        json!({
+                            "delta": delta,
+                            "stage": "generating",
+                            "active_model_profile_id": profile.id,
+                            "server_url": self.server_url,
+                        }),
+                    )
+                    .await;
+                }
+            }
+        }
+
+        Ok(full_text.trim().to_string())
+    }
+
     async fn stop_llama_server(&self) -> Result<(), String> {
         let mut child_guard = self.llama_server_child.lock().await;
         if let Some(mut child) = child_guard.take() {
@@ -615,6 +978,27 @@ fn runtime_server_port() -> u16 {
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(DEFAULT_LLAMA_SERVER_PORT)
+}
+
+async fn send_stream_event(
+    sender: &mpsc::Sender<Result<Event, Infallible>>,
+    event_name: &str,
+    payload: Value,
+) {
+    let _ = sender
+        .send(Ok(Event::default()
+            .event(event_name)
+            .data(payload.to_string())))
+        .await;
+}
+
+fn extract_stream_delta(value: &Value) -> Option<String> {
+    value
+        .pointer("/choices/0/delta/content")
+        .and_then(Value::as_str)
+        .or_else(|| value.pointer("/choices/0/text").and_then(Value::as_str))
+        .or_else(|| value.pointer("/delta").and_then(Value::as_str))
+        .map(ToOwned::to_owned)
 }
 
 fn extract_generated_text(value: &Value) -> Option<String> {

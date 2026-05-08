@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -57,43 +58,72 @@ class EngineRuntimeChatResult {
   final bool ok;
   final String message;
   final String stage;
+  final String? generatedText;
   final String? activeModelProfileId;
+  final bool accepted;
+  final bool modelStarted;
+  final bool modelStoppedAfterResponse;
+  final bool modelLoaded;
   final bool systemPromptApplied;
   final int? systemPromptChars;
   final String? systemPromptPreview;
+  final String? serverUrl;
 
   const EngineRuntimeChatResult({
     required this.ok,
     required this.message,
     required this.stage,
+    this.generatedText,
     this.activeModelProfileId,
+    required this.accepted,
+    required this.modelStarted,
+    required this.modelStoppedAfterResponse,
+    required this.modelLoaded,
     required this.systemPromptApplied,
     this.systemPromptChars,
     this.systemPromptPreview,
+    this.serverUrl,
   });
 
   String get displayText {
-    if (!ok) return message;
+    final cleanGeneratedText = generatedText?.trim();
+    if (ok && cleanGeneratedText != null && cleanGeneratedText.isNotEmpty) {
+      return cleanGeneratedText;
+    }
+
+    if (!ok) {
+      final lines = <String>[
+        'تعذر تشغيل الرد المحلي.',
+        message,
+        'runtime_stage: $stage',
+      ];
+
+      if (serverUrl != null) {
+        lines.add('server_url: $serverUrl');
+      }
+
+      if (activeModelProfileId != null) {
+        lines.add('active_model_profile_id: $activeModelProfileId');
+      }
+
+      return lines.join('\n');
+    }
 
     final lines = <String>[
       message,
-      '',
-      'runtime lifecycle is ready; actual GGUF execution adapter is not connected',
       'runtime_stage: $stage',
+      'model_started: $modelStarted',
+      'model_loaded: $modelLoaded',
+      'unloaded_after_response: $modelStoppedAfterResponse',
+      'system_prompt_applied: $systemPromptApplied',
     ];
 
     if (activeModelProfileId != null) {
       lines.add('active_model_profile_id: $activeModelProfileId');
     }
 
-    lines.add('system_prompt_applied: $systemPromptApplied');
-
-    if (systemPromptChars != null) {
-      lines.add('system_prompt_chars: $systemPromptChars');
-    }
-
-    if (systemPromptPreview != null && systemPromptPreview!.isNotEmpty) {
-      lines.add('system_prompt_preview: $systemPromptPreview');
+    if (serverUrl != null) {
+      lines.add('server_url: $serverUrl');
     }
 
     return lines.join('\n');
@@ -102,8 +132,12 @@ class EngineRuntimeChatResult {
   factory EngineRuntimeChatResult.offline(String message) {
     return EngineRuntimeChatResult(
       ok: false,
+      accepted: false,
       message: message,
       stage: 'offline',
+      modelStarted: false,
+      modelStoppedAfterResponse: false,
+      modelLoaded: false,
       systemPromptApplied: false,
     );
   }
@@ -114,17 +148,43 @@ class EngineRuntimeChatResult {
       data['stage'] ?? data['runtime_stage'] ?? runtime['stage'],
       fallback: 'completed',
     );
+    final accepted = _asNullableBool(data['accepted'] ?? runtime['accepted']);
+    final ok =
+        accepted ??
+        _asBool(
+          data['ok'] ?? data['success'] ?? runtime['ok'] ?? runtime['success'],
+          fallback: stage != 'error',
+        );
     final message = _asString(
       data['message'] ?? data['response'] ?? data['assistant_message'],
-      fallback: 'Runtime lifecycle completed successfully.',
+      fallback: ok
+          ? 'تم استلام رد من Runtime.'
+          : 'Rust Runtime رجّع خطأ غير محدد.',
     );
 
     return EngineRuntimeChatResult(
-      ok: _asBool(data['ok'] ?? data['success'], fallback: true),
+      ok: ok && stage != 'error',
+      accepted: accepted ?? ok,
       message: message,
       stage: stage,
+      generatedText: _asNullableString(
+        data['generated_text'] ?? data['assistant_message'] ?? data['response'],
+      ),
       activeModelProfileId: _asNullableString(
         data['active_model_profile_id'] ?? runtime['active_model_profile_id'],
+      ),
+      modelStarted: _asBool(
+        data['model_started'] ?? runtime['model_started'],
+        fallback: false,
+      ),
+      modelStoppedAfterResponse: _asBool(
+        data['model_stopped_after_response'] ??
+            runtime['model_stopped_after_response'],
+        fallback: false,
+      ),
+      modelLoaded: _asBool(
+        data['model_loaded'] ?? runtime['model_loaded'],
+        fallback: false,
       ),
       systemPromptApplied: _asBool(
         data['system_prompt_applied'] ?? runtime['system_prompt_applied'],
@@ -136,6 +196,7 @@ class EngineRuntimeChatResult {
       systemPromptPreview: _asNullableString(
         data['system_prompt_preview'] ?? runtime['system_prompt_preview'],
       ),
+      serverUrl: _asNullableString(data['server_url'] ?? runtime['server_url']),
     );
   }
 
@@ -162,14 +223,104 @@ class EngineRuntimeChatResult {
     return null;
   }
 
-  static bool _asBool(dynamic value, {required bool fallback}) {
+  static bool? _asNullableBool(dynamic value) {
     if (value is bool) return value;
     if (value is String) {
       final normalized = value.trim().toLowerCase();
       if (normalized == 'true') return true;
       if (normalized == 'false') return false;
     }
-    return fallback;
+    return null;
+  }
+
+  static bool _asBool(dynamic value, {required bool fallback}) {
+    return _asNullableBool(value) ?? fallback;
+  }
+}
+
+class EngineRuntimeStreamChunk {
+  final String event;
+  final String? delta;
+  final String? finalText;
+  final String message;
+  final String stage;
+  final String? activeModelProfileId;
+  final bool accepted;
+  final bool modelStarted;
+  final bool modelStoppedAfterResponse;
+  final bool modelLoaded;
+  final bool systemPromptApplied;
+  final int? systemPromptChars;
+  final String? systemPromptPreview;
+  final String? serverUrl;
+
+  const EngineRuntimeStreamChunk({
+    required this.event,
+    this.delta,
+    this.finalText,
+    required this.message,
+    required this.stage,
+    this.activeModelProfileId,
+    required this.accepted,
+    required this.modelStarted,
+    required this.modelStoppedAfterResponse,
+    required this.modelLoaded,
+    required this.systemPromptApplied,
+    this.systemPromptChars,
+    this.systemPromptPreview,
+    this.serverUrl,
+  });
+
+  bool get isToken => event == 'token' && delta != null && delta!.isNotEmpty;
+  bool get isDone => event == 'done';
+  bool get isError => event == 'error';
+
+  EngineRuntimeChatResult toResult({String? streamedText}) {
+    return EngineRuntimeChatResult(
+      ok: accepted && stage != 'error' && !isError,
+      accepted: accepted,
+      message: message,
+      stage: stage,
+      generatedText: finalText ?? streamedText,
+      activeModelProfileId: activeModelProfileId,
+      modelStarted: modelStarted,
+      modelStoppedAfterResponse: modelStoppedAfterResponse,
+      modelLoaded: modelLoaded,
+      systemPromptApplied: systemPromptApplied,
+      systemPromptChars: systemPromptChars,
+      systemPromptPreview: systemPromptPreview,
+      serverUrl: serverUrl,
+    );
+  }
+
+  factory EngineRuntimeStreamChunk.fromSse({
+    required String event,
+    required Map<String, dynamic> data,
+  }) {
+    final response = EngineRuntimeChatResult.fromResponse(data);
+    return EngineRuntimeStreamChunk(
+      event: event,
+      delta: _asNullableString(data['delta']),
+      finalText: _asNullableString(
+        data['generated_text'] ?? data['final_text'] ?? data['response'],
+      ),
+      message: response.message,
+      stage: response.stage,
+      activeModelProfileId: response.activeModelProfileId,
+      accepted: response.accepted,
+      modelStarted: response.modelStarted,
+      modelStoppedAfterResponse: response.modelStoppedAfterResponse,
+      modelLoaded: response.modelLoaded,
+      systemPromptApplied: response.systemPromptApplied,
+      systemPromptChars: response.systemPromptChars,
+      systemPromptPreview: response.systemPromptPreview,
+      serverUrl: response.serverUrl,
+    );
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value is String && value.isNotEmpty) return value;
+    return null;
   }
 }
 
@@ -415,6 +566,46 @@ class EngineClientService extends GetxService {
     super.onClose();
   }
 
+  Map<String, String> _buildManagedEngineEnvironment() {
+    final environment = Map<String, String>.from(Platform.environment);
+    final llamaServerBin = _resolveLlamaServerBinary();
+
+    if (llamaServerBin != null && llamaServerBin.trim().isNotEmpty) {
+      environment['LOGIXA_LLAMA_SERVER_BIN'] = llamaServerBin;
+    }
+
+    return environment;
+  }
+
+  String? _resolveLlamaServerBinary() {
+    final configured = Platform.environment['LOGIXA_LLAMA_SERVER_BIN'];
+    final configuredFile = _existingExecutable(configured);
+    if (configuredFile != null) return configuredFile;
+
+    final home = Platform.environment['HOME'];
+    final candidates = <String?>[
+      if (home != null && home.trim().isNotEmpty)
+        '$home/logixa_ai/tools/llama.cpp/build/bin/llama-server',
+      '${Directory.current.path}/tools/llama.cpp/build/bin/llama-server',
+      '${Directory.current.path}/../tools/llama.cpp/build/bin/llama-server',
+      '${Directory.current.path}/../../tools/llama.cpp/build/bin/llama-server',
+    ];
+
+    for (final candidate in candidates) {
+      final filePath = _existingExecutable(candidate);
+      if (filePath != null) return filePath;
+    }
+
+    return null;
+  }
+
+  String? _existingExecutable(String? filePath) {
+    if (filePath == null || filePath.trim().isEmpty) return null;
+    final file = File(filePath.trim());
+    if (!file.existsSync()) return null;
+    return file.absolute.path;
+  }
+
   Future<EngineProcessResult> startLocalEngine() async {
     if (isStartingEngine.value) {
       return EngineProcessResult.ok('Rust Engine قيد التشغيل بالفعل.');
@@ -469,6 +660,7 @@ class EngineClientService extends GetxService {
         binaryFile.path,
         const [],
         workingDirectory: engineDir.path,
+        environment: _buildManagedEngineEnvironment(),
         runInShell: false,
       );
 
@@ -675,6 +867,121 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
     }
   }
 
+  Future<EngineRuntimeChatResult> sendRuntimeChatStream({
+    required String prompt,
+    required String systemPrompt,
+    required void Function(EngineRuntimeStreamChunk chunk) onChunk,
+  }) async {
+    final streamedText = StringBuffer();
+    EngineRuntimeChatResult? finalResult;
+    var currentEvent = 'message';
+    final dataLines = <String>[];
+
+    void flushEvent() {
+      if (dataLines.isEmpty) return;
+      final rawData = dataLines.join('\n');
+      dataLines.clear();
+
+      try {
+        final decoded = jsonDecode(rawData);
+        if (decoded is! Map) return;
+
+        final chunk = EngineRuntimeStreamChunk.fromSse(
+          event: currentEvent,
+          data: Map<String, dynamic>.from(decoded),
+        );
+        onChunk(chunk);
+
+        if (chunk.isToken && chunk.delta != null) {
+          streamedText.write(chunk.delta);
+        }
+
+        if (chunk.isDone || chunk.isError) {
+          finalResult = chunk.toResult(streamedText: streamedText.toString());
+        }
+      } catch (_) {
+        // Ignore malformed SSE lines; the final error handler covers transport failures.
+      } finally {
+        currentEvent = 'message';
+      }
+    }
+
+    try {
+      final response = await _dio.post<ResponseBody>(
+        '/runtime/chat/stream',
+        data: {'prompt': prompt, 'system_prompt': systemPrompt},
+        options: Options(
+          responseType: ResponseType.stream,
+          sendTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(minutes: 10),
+        ),
+      );
+
+      final body = response.data;
+      if (body == null) {
+        return EngineRuntimeChatResult.offline(
+          'Rust Runtime لم يرجع stream body.',
+        );
+      }
+
+      await for (final line
+          in utf8.decoder
+              .bind(body.stream.cast<List<int>>())
+              .transform(const LineSplitter())) {
+        if (line.trim().isEmpty) {
+          flushEvent();
+          continue;
+        }
+
+        if (line.startsWith('event:')) {
+          currentEvent = line.substring('event:'.length).trim();
+          continue;
+        }
+
+        if (line.startsWith('data:')) {
+          dataLines.add(line.substring('data:'.length).trimLeft());
+        }
+      }
+
+      flushEvent();
+      await refreshEngineStatus(silent: true);
+      return finalResult ??
+          EngineRuntimeChatResult(
+            ok: streamedText.isNotEmpty,
+            accepted: streamedText.isNotEmpty,
+            message: streamedText.isNotEmpty
+                ? 'تم استلام رد Streaming من Runtime.'
+                : 'انتهى stream بدون رد من الموديل.',
+            stage: streamedText.isNotEmpty ? 'completed' : 'error',
+            generatedText: streamedText.toString(),
+            modelStarted: false,
+            modelStoppedAfterResponse: false,
+            modelLoaded: false,
+            systemPromptApplied: false,
+          );
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineRuntimeChatResult.offline(_friendlyError(error));
+    }
+  }
+
+  Future<EngineSyncResult> stopRuntimeGeneration() async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/runtime/stop-generation',
+      );
+      await refreshEngineStatus(silent: true);
+      return EngineSyncResult.fromResponse({
+        'saved': true,
+        'message': 'تم طلب إيقاف التوليد.',
+        ..._asMap(response.data),
+      });
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineSyncResult.offline(_friendlyError(error));
+    }
+  }
+
   Future<EngineRuntimeChatResult> sendRuntimeChat({
     required String prompt,
     required String systemPrompt,
@@ -683,6 +990,10 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
       final response = await _dio.post<Map<String, dynamic>>(
         '/runtime/chat',
         data: {'prompt': prompt, 'system_prompt': systemPrompt},
+        options: Options(
+          sendTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(minutes: 5),
+        ),
       );
       await refreshEngineStatus(silent: true);
       return EngineRuntimeChatResult.fromResponse(_asMap(response.data));
