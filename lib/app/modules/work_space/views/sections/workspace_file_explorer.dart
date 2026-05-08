@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as path;
+import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../../constants/app_colors.dart';
 import '../../../../constants/app_fonts.dart';
@@ -36,7 +39,10 @@ class _WorkspaceFileExplorerState extends State<WorkspaceFileExplorer> {
       decoration: const BoxDecoration(
         color: AppColors.sidebar,
         border: Border(
-          right: BorderSide(color: AppColors.border, width: AppSizes.borderThin),
+          right: BorderSide(
+            color: AppColors.border,
+            width: AppSizes.borderThin,
+          ),
         ),
       ),
       child: Column(
@@ -146,8 +152,14 @@ class _ExplorerRootHeader extends GetView<WorkSpaceController> {
         ),
         decoration: const BoxDecoration(
           border: Border(
-            top: BorderSide(color: AppColors.border, width: AppSizes.borderThin),
-            bottom: BorderSide(color: AppColors.border, width: AppSizes.borderThin),
+            top: BorderSide(
+              color: AppColors.border,
+              width: AppSizes.borderThin,
+            ),
+            bottom: BorderSide(
+              color: AppColors.border,
+              width: AppSizes.borderThin,
+            ),
           ),
         ),
         child: Row(
@@ -255,21 +267,52 @@ class _WorkspaceTreeTile extends GetView<WorkSpaceController> {
       final isExpanded = controller.isDirectoryExpanded(item);
       final isOpened = controller.isFileOpened(item);
 
-      return ReusableWorkspaceTreeTile(
-        label: item.name,
-        depth: item.depth,
-        icon: _resolveIcon(item, isExpanded),
-        iconColor: _resolveIconColor(item),
-        isDirectory: item.isDirectory,
-        isExpanded: isExpanded,
-        isActive: isOpened,
-        onTap: () {
-          if (item.isDirectory) {
-            controller.toggleDirectory(item);
-          } else {
-            controller.openFile(item);
-          }
-        },
+      return ContextMenuWidget(
+        menuProvider: (_) => Menu(
+          children: [
+            MenuAction(
+              title: AppStrings.workspaceContextOpen,
+              callback: () {
+                unawaited(controller.openWorkspaceItemFromContextMenu(item));
+              },
+            ),
+            MenuAction(
+              title: AppStrings.workspaceContextCopyPath,
+              callback: () {
+                unawaited(controller.copyWorkspaceItemPath(item));
+              },
+            ),
+            MenuAction(
+              title: AppStrings.workspaceContextRevealPath,
+              callback: () {
+                unawaited(controller.revealWorkspaceItemPath(item));
+              },
+            ),
+            MenuSeparator(),
+            MenuAction(
+              title: AppStrings.workspaceContextRefresh,
+              callback: () {
+                unawaited(controller.refreshWorkspace());
+              },
+            ),
+          ],
+        ),
+        child: ReusableWorkspaceTreeTile(
+          label: item.name,
+          depth: item.depth,
+          icon: _resolveIcon(item, isExpanded),
+          iconColor: _resolveIconColor(item),
+          isDirectory: item.isDirectory,
+          isExpanded: isExpanded,
+          isActive: isOpened,
+          onTap: () {
+            if (item.isDirectory) {
+              controller.toggleDirectory(item);
+            } else {
+              controller.openFile(item);
+            }
+          },
+        ),
       );
     });
   }
@@ -368,7 +411,10 @@ class _ExplorerFooter extends GetView<WorkSpaceController> {
         ),
         decoration: const BoxDecoration(
           border: Border(
-            top: BorderSide(color: AppColors.border, width: AppSizes.borderThin),
+            top: BorderSide(
+              color: AppColors.border,
+              width: AppSizes.borderThin,
+            ),
           ),
         ),
         child: ReusableText(

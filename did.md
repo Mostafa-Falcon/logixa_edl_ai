@@ -2058,3 +2058,59 @@ flutter run -d linux
 
 ### الحالة
 جاهزة للفحص. إذا نجح `flutter analyze` واشتغل التطبيق، يتم اعتماد Step 17 بالكامل ثم commit/tag.
+
+---
+
+## Step 18 — Workspace Context Menu
+
+### الهدف
+تنفيذ Step 18 من `todo.md` فقط: إضافة context menu على عناصر شجرة ملفات Workspace باستخدام `super_context_menu`، بدون تنفيذ إنشاء/إعادة تسمية/حذف وبدون تعديل Rust Engine أو تشغيل GGUF.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع الأعلى ولم يتم تعديله.
+- تمت مراجعة `did.md` لمعرفة آخر نقطة مستقرة: Step 17 بعد QA cleanup.
+- تمت مراجعة `todo.md` وتحديد نطاق Step 18 فقط.
+
+### ما تم تنفيذه
+- إضافة `ContextMenuWidget` حول كل عنصر في شجرة ملفات Workspace.
+- إضافة actions آمنة فقط حسب نطاق Step 18:
+  - فتح الملف أو فتح/طي المجلد.
+  - نسخ مسار الملف/المجلد إلى Clipboard.
+  - إظهار مكان الملف/المجلد في مدير ملفات النظام.
+  - تحديث شجرة Workspace.
+- إضافة methods في `WorkSpaceController` لتنفيذ أوامر القائمة بدل وضع logic داخل الواجهة.
+- إضافة رسائل وأسماء actions في `AppStrings` بدل hardcoded strings داخل الواجهة.
+- استخدام `super_context_menu` الموجود مسبقًا في `pubspec.yaml` بدون إضافة package جديد.
+
+### الملفات التي تم تعديلها
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/work_space/controllers/work_space_controller.dart`
+- `lib/app/modules/work_space/views/sections/workspace_file_explorer.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تنفيذ Create/Rename/Delete لأنها مؤجلة لحين تثبيت الأمان.
+- لم يتم تنفيذ Terminal الحقيقي.
+- لم يتم تنفيذ محرر كود حقيقي.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تعديل Rust Engine.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب
+- افتح Workspace.
+- اضغط Right Click على ملف وتأكد أن القائمة تظهر.
+- جرّب `فتح` على ملف وتأكد أنه يفتح في التبويب.
+- جرّب `نسخ المسار` ثم الصقه في Terminal أو ملف نصي للتأكد.
+- جرّب `إظهار في مدير الملفات` وتأكد أن مدير الملفات يفتح على مكان العنصر.
+- جرّب `تحديث الشجرة` وتأكد أن الملفات ما زالت ظاهرة بدون crash.
+- جرّب Right Click على مجلد وتأكد أن `فتح` يفتح/يطوي المجلد.
+
+### الحالة
+جاهزة للفحص والاعتماد بعد نجاح `flutter analyze` والتجربة اليدوية.

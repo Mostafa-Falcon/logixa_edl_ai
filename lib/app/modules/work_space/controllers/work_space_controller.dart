@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:path/path.dart' as path;
@@ -179,6 +180,55 @@ class WorkSpaceController extends GetxController {
 
   bool isFileInTabs(String filePath) {
     return openedFiles.any((file) => file.path == filePath);
+  }
+
+  Future<void> openWorkspaceItemFromContextMenu(
+    WorkspaceFileItemModel item,
+  ) async {
+    if (item.isDirectory) {
+      toggleDirectory(item);
+      return;
+    }
+
+    await openFile(item);
+  }
+
+  Future<void> copyWorkspaceItemPath(WorkspaceFileItemModel item) async {
+    await Clipboard.setData(ClipboardData(text: item.path));
+    _pushWorkspaceLog(
+      '${AppStrings.workspacePathCopiedLogPrefix} ${item.path}',
+    );
+  }
+
+  Future<void> revealWorkspaceItemPath(WorkspaceFileItemModel item) async {
+    try {
+      final revealTargetPath = item.isDirectory
+          ? item.path
+          : File(item.path).parent.path;
+
+      if (Platform.isLinux) {
+        await Process.start('xdg-open', [revealTargetPath]);
+      } else if (Platform.isMacOS) {
+        await Process.start(
+          'open',
+          item.isDirectory ? [item.path] : ['-R', item.path],
+        );
+      } else if (Platform.isWindows) {
+        await Process.start(
+          'explorer',
+          item.isDirectory ? [revealTargetPath] : ['/select,', item.path],
+        );
+      } else {
+        _pushWorkspaceLog(AppStrings.workspacePathRevealUnsupported);
+        return;
+      }
+
+      _pushWorkspaceLog(
+        '${AppStrings.workspacePathRevealStartedPrefix} ${item.path}',
+      );
+    } catch (error) {
+      _pushWorkspaceLog('${AppStrings.workspacePathRevealFailedPrefix} $error');
+    }
   }
 
   Future<void> openFile(WorkspaceFileItemModel item) async {

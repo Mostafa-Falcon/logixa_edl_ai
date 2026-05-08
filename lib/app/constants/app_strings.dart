@@ -145,6 +145,16 @@ class AppStrings {
   static const String workspaceProjectFilesReadFailedPrefix =
       'تعذر قراءة ملفات المشروع:';
 
+  static const String workspaceContextOpen = 'فتح';
+  static const String workspaceContextCopyPath = 'نسخ المسار';
+  static const String workspaceContextRevealPath = 'إظهار في مدير الملفات';
+  static const String workspaceContextRefresh = 'تحديث الشجرة';
+  static const String workspacePathCopiedLogPrefix = 'تم نسخ المسار:';
+  static const String workspacePathRevealStartedPrefix = 'تم طلب إظهار المسار:';
+  static const String workspacePathRevealFailedPrefix = 'تعذر إظهار المسار:';
+  static const String workspacePathRevealUnsupported =
+      'إظهار المسار غير مدعوم على هذا النظام حاليًا.';
+
   static const String showLess = 'عرض أقل';
   static const String deleteWorkspace = 'إزالة مساحة العمل';
   static const String deleteWorkspaceConfirmation =
