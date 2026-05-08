@@ -1,0 +1,142 @@
+# ============================================================
+# Logixa EDL AI — Git Ignore
+# Flutter Desktop + Local Rust Engine + Local Models
+# ============================================================
+
+# ------------------------------------------------------------
+# OS / Editors / Temporary files
+# ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code
+# Keep this commented if you want to share workspace tasks/settings later.
+#.vscode/
+
+# Misc
+*.class
+*.pyc
+__pycache__/
+.history/
+.svn/
+.atom/
+
+# ------------------------------------------------------------
+# Logs
+# ------------------------------------------------------------
+*.log
+logs/
+**/logs/
+
+# ------------------------------------------------------------
+# Flutter / Dart / Pub
+# ------------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Symbolication / obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android build outputs
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+
+# Flutter desktop ephemeral files
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# ------------------------------------------------------------
+# Rust Engine
+# ------------------------------------------------------------
+logixa_engine/target/
+
+# IMPORTANT:
+# Cargo.lock is intentionally NOT ignored because logixa_engine is an app/binary,
+# and committing Cargo.lock keeps Rust dependency resolution reproducible.
+
+# ------------------------------------------------------------
+# Local Engine Runtime Config / Databases
+# ------------------------------------------------------------
+logixa_engine/logixa_engine_config.json
+logixa_engine/logixa_engine_memory.sqlite
+logixa_engine/*.sqlite
+logixa_engine/*.sqlite3
+logixa_engine/*.db
+logixa_engine/*.db-shm
+logixa_engine/*.db-wal
+logixa_engine/*.sqlite-shm
+logixa_engine/*.sqlite-wal
+logixa_engine/*.sqlite3-shm
+logixa_engine/*.sqlite3-wal
+
+# Keep examples/templates tracked.
+!logixa_engine/*.example.json
+!logixa_engine/**/*.example.json
+
+# ------------------------------------------------------------
+# Local AI Models / Heavy Model Files
+# ------------------------------------------------------------
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+models/
+local_models/
+logixa_models/
+logixa_engine/models/
+logixa_engine/local_models/
+
+# ------------------------------------------------------------
+# Local Secrets / Environment
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+secrets/
+
+# ------------------------------------------------------------
+# Local Workspace / Runtime Artifacts
+# ------------------------------------------------------------
+.logixa_runtime/
+.runtime/
+cache/
+tmp/
+temp/
+
+# If a workspace is accidentally created inside the app repo,
+# do not commit generated local workspace metadata.
+**/.logixa/cache/
+**/.logixa/runtime/
+**/.logixa/logs/

@@ -1,0 +1,12 @@
+{
+  "host": "127.0.0.1",
+  "port": 8787,
+  "local_model_enabled": false,
+  "active_model_profile_id": null,
+  "active_model_profile": null,
+  "system_prompt": "أنت Logixa EDL AI، مساعد محلي داخل بيئة تطوير وتحكم ذكية.",
+  "auto_start_on_message": true,
+  "keep_model_loaded": false,
+  "unload_after_response": true,
+  "allow_background_model": false
+}
