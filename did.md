@@ -1,3 +1,5 @@
+
+
 <!-- REVIEW02_SUMMARY_INDEX_START -->
 
 # Review 02 Summary Index — Current Execution State
@@ -75,7 +77,6 @@ Step 28  — Extensions System Planning
 ```
 
 <!-- REVIEW02_SUMMARY_INDEX_END -->
-
 
 # did.md — Logixa EDL AI Execution Log
 
@@ -3000,3 +3001,33 @@ flutter run -d linux
 ### المؤجل
 - Auto Router مؤجل.
 - أي routing ذكي حسب طول الطلب أو نوع المهمة مؤجل.
+
+---
+
+## Review 02 — Documentation Reconciliation
+
+### الهدف
+تحديث ملفات التوثيق لتطابق الحالة الحقيقية بعد Step 24، بدون تعديل أي كود Flutter أو Rust.
+
+### ما تم تنفيذه
+- تحديث `README.md` ليعرض المعمارية الحالية وقواعد التشغيل الصارمة.
+- تحديث `todo.md` ليبدأ من الحالة الحالية بدل خطة Step 10 القديمة.
+- إضافة Summary Index أعلى `did.md` مع الحفاظ على السجل الأصلي أسفله.
+- تثبيت أن الخطوة التالية بعد التوثيق هي `Step 25 — Codebase Hygiene Pass`.
+
+### الملفات التي تم تعديلها
+- `README.md`
+- `todo.md`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل أي كود Dart.
+- لم يتم تعديل أي كود Rust.
+- لم يتم تنفيذ Extensions.
+- لم يتم تغيير إعدادات الموديل أو الـ Runtime.
+
+### أوامر الفحص المقترحة
+```bash
+git diff -- README.md todo.md did.md
+git status --short
+```
