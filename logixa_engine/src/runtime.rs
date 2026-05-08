@@ -160,16 +160,6 @@ impl RuntimeManager {
                 )
                 .await;
         }
-
-        if is_temporarily_blocked_12b_path(&profile.model_path) {
-            return self
-                .reject_for_profile(
-                    profile.id.clone(),
-                    "model_temporarily_blocked_12b_use_4b_first".to_string(),
-                )
-                .await;
-        }
-
         if !Path::new(&profile.model_path).is_file() {
             return self
                 .reject_for_profile(
@@ -497,139 +487,6 @@ impl RuntimeManager {
             send_stream_event(&sender, "error", json!(response)).await;
             return;
         }
-
-        if is_temporarily_blocked_12b_path(&profile.model_path) {
-            let response = self
-                .reject_for_profile(
-                    profile.id.clone(),
-                    "model_temporarily_blocked_12b_use_4b_first".to_string(),
-                )
-                .await;
-            send_stream_event(&sender, "error", json!(response)).await;
-            return;
-        }
-
-        if !Path::new(&profile.model_path).is_file() {
-            let response = self
-                .reject_for_profile(
-                    profile.id.clone(),
-                    format!("model_path_not_found: {}", profile.model_path),
-                )
-                .await;
-            send_stream_event(&sender, "error", json!(response)).await;
-            return;
-        }
-
-        if let Err(message) = validate_llama_server_bin() {
-            let response = self.reject_for_profile(profile.id.clone(), message).await;
-            send_stream_event(&sender, "error", json!(response)).await;
-            return;
-        }
-
-        let system_prompt = resolve_system_prompt(&config, payload.system_prompt);
-        let system_prompt_chars = system_prompt
-            .as_deref()
-            .map(|value| value.chars().count())
-            .unwrap_or_default();
-        let system_prompt_preview = system_prompt
-            .as_deref()
-            .map(|value| preview_text(value, 160))
-            .filter(|value| !value.is_empty());
-        let system_prompt_applied = system_prompt_chars > 0;
-
-        self.update_state(|state| {
-            state.stage = RuntimeStage::Starting;
-            state.model_loaded = false;
-            state.active_model_profile_id = Some(profile.id.clone());
-            state.total_requests = state.total_requests.saturating_add(1);
-            state.last_event = Some("stream_starting_llama_server".to_string());
-            state.last_error = None;
-            state.last_request_epoch_seconds = Some(now_epoch_seconds());
-            state.last_system_prompt_chars = system_prompt_chars;
-            state.last_system_prompt_preview = system_prompt_preview.clone();
-            state.server_url = Some(self.server_url.clone());
-        })
-        .await;
-
-        send_stream_event(
-            &sender,
-            "status",
-            json!({
-                "stage": "starting",
-                "message": "starting_llama_server",
-                "active_model_profile_id": profile.id,
-                "server_url": self.server_url,
-                "system_prompt_applied": system_prompt_applied,
-                "system_prompt_chars": system_prompt_chars,
-                "system_prompt_preview": system_prompt_preview,
-            }),
-        )
-        .await;
-
-        let model_started = match self.ensure_llama_server_ready(&profile).await {
-            Ok(started) => started,
-            Err(message) => {
-                let response = self
-                    .fail(
-                        profile.id.clone(),
-                        message,
-                        system_prompt_applied,
-                        system_prompt_chars,
-                        system_prompt_preview.clone(),
-                    )
-                    .await;
-                send_stream_event(&sender, "error", json!(response)).await;
-                return;
-            }
-        };
-
-        self.update_state(|state| {
-            state.stage = RuntimeStage::Generating;
-            state.model_loaded = true;
-            state.last_event = Some("stream_generating".to_string());
-            state.last_error = None;
-        })
-        .await;
-
-        send_stream_event(
-            &sender,
-            "status",
-            json!({
-                "stage": "generating",
-                "message": "stream_generation_started",
-                "model_started": model_started,
-                "active_model_profile_id": profile.id,
-                "server_url": self.server_url,
-            }),
-        )
-        .await;
-
-        let generated_text = match self
-            .send_chat_completion_stream(&profile, system_prompt.as_deref(), &prompt, &sender)
-            .await
-        {
-            Ok(text) => text,
-            Err(message) => {
-                let response = self
-                    .fail(
-                        profile.id.clone(),
-                        message,
-                        system_prompt_applied,
-                        system_prompt_chars,
-                        system_prompt_preview.clone(),
-                    )
-                    .await;
-                send_stream_event(&sender, "error", json!(response)).await;
-                return;
-            }
-        };
-
-        let mut stopped_after_response = false;
-        if config.unload_after_response && !config.keep_model_loaded {
-            stopped_after_response = true;
-            let _ = self.stop_llama_server().await;
-        }
-
         let snapshot = self
             .update_state(|state| {
                 state.stage = RuntimeStage::Completed;
@@ -953,12 +810,6 @@ fn validate_llama_server_bin() -> Result<(), String> {
 
     Err(format!("{LLAMA_SERVER_MAINTENANCE_MESSAGE}: {server_bin}"))
 }
-
-fn is_temporarily_blocked_12b_path(model_path: &str) -> bool {
-    let normalized = model_path.to_lowercase();
-    normalized.contains("12b")
-}
-
 fn runtime_server_url() -> String {
     env::var("LOGIXA_LLAMA_SERVER_URL")
         .ok()

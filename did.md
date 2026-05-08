@@ -2808,3 +2808,30 @@ flutter run -d linux
 - لا يوجد تغيير في prompt defaults.
 - لا يوجد تغيير في model router.
 - لا يوجد تغيير في Extensions.
+
+## Step 24 — Runtime Model Router 4B/12B: unblock selected model
+
+### الهدف
+بدء Step 24 الرسمية بإزالة المنع المؤقت الذي كان يمنع تحميل موديلات 12B، لأن اختيار الموديل يجب أن يكون من الـ active model profile الذي يحفظه المستخدم من Flutter، وليس من شرط ثابت داخل Rust.
+
+### ما تم
+- إزالة شرط `model_temporarily_blocked_12b_use_4b_first` من Runtime.
+- حذف helper المؤقت `is_temporarily_blocked_12b_path` إن كان موجودًا.
+- الحفاظ على قاعدة: Runtime لا يحمّل 4B و12B معًا؛ هو يشغل فقط الـ active model profile الحالي.
+- الحفاظ على منع الـ hidden/default system prompt: `system_prompt_applied` يعتمد على وجود prompt فعلي غير فارغ.
+
+### حدود الخطوة
+- لا Auto Router حتى الآن.
+- لا تحميل متوازي لموديلين.
+- لا تغيير في Flutter UI.
+- لا تغيير في prompt defaults.
+- لا Streaming changes.
+
+### الاختبارات المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo fmt && cargo check`
+- اختيار موديل 4B وتشغيل رسالة قصيرة.
+- اختيار موديل 12B absolute path وتجربة التشغيل مع مراقبة RAM/CPU؛ الفشل بسبب الذاكرة أو وقت التحميل يعتبر runtime/environment issue وليس block ثابت.
+
+### الخطوة التالية
+إكمال Step 24 Router UI/Policy عند الحاجة: Manual Fast/Quality selection واضح، ثم Auto Router لاحقًا فقط.
