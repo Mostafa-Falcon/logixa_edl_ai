@@ -3,14 +3,18 @@ part of 'app_pages.dart';
 
 abstract class Routes {
   Routes._();
+
   static const home = _Paths.home;
   static const workSpace = _Paths.workSpace;
+  static const chatPage = _Paths.chatPage;
   static const settings = _Paths.settings;
 }
 
 abstract class _Paths {
   _Paths._();
+
   static const home = '/home';
   static const workSpace = '/work-space';
+  static const chatPage = '/chat-page';
   static const settings = '/settings';
 }

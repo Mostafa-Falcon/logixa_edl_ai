@@ -30,7 +30,7 @@ class WorkspaceBottomPanel extends GetView<WorkSpaceController> {
         curve: Curves.easeOutCubic,
         height: isVisible
             ? AppSizes.workspaceBottomPanelHeight.h
-            : AppSizes.workspaceBottomPanelCollapsedHeight.h,
+            : AppSizes.workspaceBottomPanelCollapsedHeight.h + 1.0,
         decoration: const BoxDecoration(
           color: AppColors.panel,
           border: Border(

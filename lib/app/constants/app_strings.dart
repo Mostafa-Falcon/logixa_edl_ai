@@ -43,6 +43,8 @@ class AppStrings {
   static const String commandsTooltip = 'الأوامر الذكية';
   static const String settingsTooltip = 'الإعدادات';
   static const String refreshEngineStatusTooltip = 'تحديث حالة Rust Engine';
+  static const String startEngineTooltip = 'تشغيل Rust Engine من الواجهة';
+  static const String stopEngineTooltip = 'إيقاف Rust Engine من الواجهة';
 
   static const String enableLocalModelTooltip = 'تفعيل وضع الموديل المحلي';
   static const String disableLocalModelTooltip = 'إيقاف وضع الموديل المحلي';
@@ -127,7 +129,7 @@ class AppStrings {
 
   static const String engineStatusTitle = 'حالة Rust Engine';
   static const String engineStatusDescription =
-      'فحص اتصال Flutter بالمحرك المحلي فقط. هذه الخطوة لا تغيّر إعدادات الموديل ولا تشغّل GGUF.';
+      'عرض تفصيلي لحالة المحرك فقط. التحكم في التشغيل والتحديث من الشريط العلوي.';
   static const String engineOnline = 'المحرك متصل';
   static const String engineOffline = 'المحرك غير متصل';
   static const String engineChecking = 'جاري الفحص';
@@ -198,7 +200,8 @@ class AppStrings {
       'تم حفظ السيستم برومبت ومزامنته مع Rust Engine.';
   static const String systemPromptSavedLocallyOnly =
       'تم حفظ السيستم برومبت محليًا فقط، وتعذرت مزامنته مع Rust Engine.';
-  static const String systemPromptReset = 'تمت استعادة السيستم برومبت الافتراضي.';
+  static const String systemPromptReset =
+      'تمت استعادة السيستم برومبت الافتراضي.';
   static const String systemPromptResetAndSyncedToRust =
       'تمت استعادة السيستم برومبت الافتراضي ومزامنته مع Rust Engine.';
   static const String systemPromptResetLocallyOnly =
@@ -240,13 +243,32 @@ class AppStrings {
   static const String loadPolicyLabel = 'Load Policy';
   static const String ramPolicyLabel = 'RAM Policy';
 
+  static const String chatPageTitle = 'الشات المحلي';
+  static const String chatPageSubtitle =
+      'واجهة شات مبدئية. حالة Rust Engine وتشغيله من الشريط العلوي فقط.';
+  static const String chatWelcomeMessage =
+      'الشات جاهز كبداية حقيقية. اكتب رسالة، وسيتم إرسالها إلى Rust /runtime/chat باستخدام البروفايل النشط من الإعدادات فقط، بدون تشغيل GGUF فعليًا في هذه الخطوة.';
+  static const String chatProfileSelectorTitle = 'اختيار بروفايل التشغيل';
+  static const String chatProfileSelectorDescription =
+      'استخدم البروفايل النشط أو اختار بروفايل يدويًا قبل إرسال الرسالة.';
+  static const String chatActiveProfileLabel = 'البروفايل المستخدم';
+  static const String chatRuntimeNoteLabel = 'ملاحظة التشغيل';
+  static const String chatRuntimeNote =
+      'تشغيل lifecycle فقط، بدون llama.cpp وبدون Streaming.';
+  static const String chatNoGgufNotice =
+      'Step 14 لا يشغل أي موديل GGUF حقيقي. الربط الحالي يختبر دورة Runtime فقط.';
+  static const String chatInputHint = 'اكتب رسالتك هنا...';
+  static const String chatSendButton = 'إرسال';
+  static const String chatSendingStatus = 'جاري الإرسال';
+
   static const String workspaceBottomPanelTerminal = 'Terminal';
   static const String workspaceBottomPanelLogs = 'Logs';
   static const String workspaceBottomPanelProblems = 'Problems';
   static const String workspaceBottomPanelOutput = 'Output';
   static const String workspaceBottomPanelToggle = 'إظهار/إخفاء اللوحة السفلية';
   static const String workspaceBottomPanelClearLogs = 'مسح اللوجات';
-  static const String workspaceTerminalPlaceholderTitle = 'الطرفية المحلية جاهزة كمساحة مبدئية';
+  static const String workspaceTerminalPlaceholderTitle =
+      'الطرفية المحلية جاهزة كمساحة مبدئية';
   static const String workspaceTerminalPlaceholderMessage =
       'التشغيل الحقيقي للـ Terminal باستخدام xterm و flutter_pty مؤجل لخطوة مستقلة عشان ما نكسرش الاستقرار الحالي.';
   static const String workspaceLogsEmpty = 'لا توجد لوجات لمساحة العمل بعد.';

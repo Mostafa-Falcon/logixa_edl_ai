@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../modules/chat_page/bindings/chat_page_binding.dart';
+import '../modules/chat_page/views/chat_page_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
@@ -24,6 +26,11 @@ class AppPages {
       name: _Paths.workSpace,
       page: () => const WorkSpaceView(),
       binding: WorkSpaceBinding(),
+    ),
+    GetPage(
+      name: _Paths.chatPage,
+      page: () => const ChatPageView(),
+      binding: ChatPageBinding(),
     ),
     GetPage(
       name: _Paths.settings,

@@ -8,21 +8,29 @@ import '../../../data/services/engine_client_service.dart';
 
 class TopBarController extends GetxController with WindowListener {
   final AppSettingsService settingsService = Get.find<AppSettingsService>();
-  final EngineClientService engineClientService = Get.find<EngineClientService>();
+  final EngineClientService engineClientService =
+      Get.find<EngineClientService>();
 
   final isMaximized = false.obs;
+  bool _isClosing = false;
 
   RxBool get isLocalModelEnabled => settingsService.localModelEnabled;
 
   String get engineStatusLabel {
     final status = engineClientService.engineStatus.value;
+    if (engineClientService.isStartingEngine.value) return 'تشغيل المحرك';
+    if (engineClientService.isStoppingEngine.value) return 'إيقاف المحرك';
     if (status.isChecking) return 'فحص المحرك';
-    return status.isOnline ? 'Engine Online' : 'Engine Offline';
+    return status.isOnline ? 'المحرك متصل' : 'المحرك غير متصل';
   }
 
   Color get engineStatusColor {
     final status = engineClientService.engineStatus.value;
-    if (status.isChecking) return AppColors.runtimeBusy;
+    if (engineClientService.isStartingEngine.value ||
+        engineClientService.isStoppingEngine.value ||
+        status.isChecking) {
+      return AppColors.runtimeBusy;
+    }
     return status.isOnline ? AppColors.runtimeRunning : AppColors.runtimeError;
   }
 
@@ -59,6 +67,11 @@ class TopBarController extends GetxController with WindowListener {
     isMaximized.value = false;
   }
 
+  @override
+  void onWindowClose() {
+    _closeApp();
+  }
+
   Future<void> toggleMaximize() async {
     final currentlyMaximized = await windowManager.isMaximized();
     if (currentlyMaximized) {
@@ -70,18 +83,52 @@ class TopBarController extends GetxController with WindowListener {
   }
 
   Future<void> toggleLocalModelMode() async {
-    await settingsService.setLocalModelEnabled(!settingsService.localModelEnabled.value);
+    await settingsService.setLocalModelEnabled(
+      !settingsService.localModelEnabled.value,
+    );
   }
 
   Future<void> refreshEngineStatus() async {
     await engineClientService.refreshEngineStatus();
   }
 
+  Future<void> toggleRustEngine() async {
+    final status = engineClientService.engineStatus.value;
+    final busy =
+        engineClientService.isStartingEngine.value ||
+        engineClientService.isStoppingEngine.value ||
+        status.isChecking;
+
+    if (busy) return;
+
+    final result = status.isOnline
+        ? await engineClientService.stopLocalEngine()
+        : await engineClientService.startLocalEngine();
+
+    if (!result.ok) {
+      Get.snackbar(
+        'Rust Engine',
+        result.message,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorSoft,
+        colorText: AppColors.textPrimary,
+      );
+    }
+  }
+
   void minimizeWindow() {
     windowManager.minimize();
   }
 
-  void closeWindow() {
-    windowManager.close();
+  Future<void> closeWindow() async {
+    await _closeApp();
+  }
+
+  Future<void> _closeApp() async {
+    if (_isClosing) return;
+    _isClosing = true;
+
+    await engineClientService.stopLocalEngine();
+    await windowManager.destroy();
   }
 }

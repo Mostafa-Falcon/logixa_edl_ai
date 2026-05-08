@@ -36,6 +36,7 @@ Future<void> _setupWindow() async {
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.setResizable(true);
     await windowManager.setMinimumSize(const Size(1280, 720));
+    await windowManager.setPreventClose(true);
     await windowManager.show();
     await windowManager.focus();
   });

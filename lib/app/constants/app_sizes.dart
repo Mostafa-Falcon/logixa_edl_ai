@@ -6,7 +6,7 @@ class AppSizes {
   static const double workspaceActivityBarWidth = 52;
   static const double workspaceSidePanelWidth = 300;
   static const double workspaceBottomPanelHeight = 230;
-  static const double workspaceBottomPanelCollapsedHeight = 38;
+  static const double workspaceBottomPanelCollapsedHeight = 44;
 
   static const double xs = 4;
   static const double sm = 8;

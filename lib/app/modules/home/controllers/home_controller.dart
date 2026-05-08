@@ -56,6 +56,11 @@ class HomeController extends GetxController {
       return;
     }
 
+    if (selectedItem.label == AppStrings.navChat) {
+      Get.toNamed(Routes.chatPage);
+      return;
+    }
+
     if (selectedItem.label == AppStrings.navSettings) {
       Get.toNamed(Routes.settings);
     }
@@ -112,7 +117,10 @@ class HomeController extends GetxController {
         path: workspaceDirectory.path,
       );
 
-      _openWorkspace(workspace, successMessage: AppStrings.workspaceCreatedMessage);
+      _openWorkspace(
+        workspace,
+        successMessage: AppStrings.workspaceCreatedMessage,
+      );
     } catch (error) {
       _showError('${AppStrings.workspaceCreateFailedMessage}\n$error');
     } finally {
@@ -132,11 +140,17 @@ class HomeController extends GetxController {
       path: selectedPath,
     );
 
-    _openWorkspace(workspace, successMessage: AppStrings.workspaceOpenedMessage);
+    _openWorkspace(
+      workspace,
+      successMessage: AppStrings.workspaceOpenedMessage,
+    );
   }
 
   void openRecentWorkspace(WorkspaceModel workspace) {
-    _openWorkspace(workspace, successMessage: AppStrings.workspaceSelectedMessage);
+    _openWorkspace(
+      workspace,
+      successMessage: AppStrings.workspaceSelectedMessage,
+    );
   }
 
   Future<void> confirmDeleteWorkspace(WorkspaceModel workspace) async {
@@ -295,14 +309,17 @@ class HomeController extends GetxController {
     final storedWorkspaces = stored
         .whereType<Map>()
         .map((item) => WorkspaceModel.fromJson(Map<String, dynamic>.from(item)))
-        .where((workspace) => workspace.name.isNotEmpty && workspace.path.isNotEmpty)
+        .where(
+          (workspace) => workspace.name.isNotEmpty && workspace.path.isNotEmpty,
+        )
         .map(_normalizeWorkspace);
 
     for (final workspace in storedWorkspaces) {
       final normalizedName = workspace.name.trim().toLowerCase();
       final normalizedPath = _normalizePath(workspace.path);
 
-      if (seenNames.contains(normalizedName) || seenPaths.contains(normalizedPath)) {
+      if (seenNames.contains(normalizedName) ||
+          seenPaths.contains(normalizedPath)) {
         continue;
       }
 
@@ -358,7 +375,9 @@ class HomeController extends GetxController {
     final stored = _storage.read(_activeWorkspaceStorageKey);
     if (stored is! Map) return null;
 
-    final workspace = WorkspaceModel.fromJson(Map<String, dynamic>.from(stored));
+    final workspace = WorkspaceModel.fromJson(
+      Map<String, dynamic>.from(stored),
+    );
     if (workspace.name.trim().isEmpty || workspace.path.trim().isEmpty) {
       return null;
     }
@@ -367,7 +386,10 @@ class HomeController extends GetxController {
   }
 
   void _saveActiveWorkspace(WorkspaceModel workspace) {
-    _storage.write(_activeWorkspaceStorageKey, _normalizeWorkspace(workspace).toJson());
+    _storage.write(
+      _activeWorkspaceStorageKey,
+      _normalizeWorkspace(workspace).toJson(),
+    );
   }
 
   WorkspaceModel _normalizeWorkspace(WorkspaceModel workspace) {
@@ -381,9 +403,9 @@ class HomeController extends GetxController {
 
   String _normalizePath(String value) {
     final expanded = value.trim().replaceFirst(
-          RegExp(r'^~(?=/|\\)'),
-          Platform.environment['HOME'] ?? '~',
-        );
+      RegExp(r'^~(?=/|\\)'),
+      Platform.environment['HOME'] ?? '~',
+    );
     return path.normalize(path.absolute(expanded));
   }
 

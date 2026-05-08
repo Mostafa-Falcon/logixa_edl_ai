@@ -41,14 +41,36 @@ class TopBarActionsSection extends GetView<TopBarController> {
             ),
           ),
           Obx(() {
-            final isOnline = controller.engineClientService.engineStatus.value.isOnline;
-            final isChecking = controller.engineClientService.engineStatus.value.isChecking;
+            final service = controller.engineClientService;
+            final status = service.engineStatus.value;
+            final isBusy = status.isChecking;
 
             return _TopBarActionButton(
               tooltip: AppStrings.refreshEngineStatusTooltip,
-              icon: isChecking ? Icons.sync_rounded : Icons.cloud_sync_rounded,
-              active: isOnline,
-              onPressed: controller.refreshEngineStatus,
+              icon: isBusy ? Icons.sync_rounded : Icons.refresh_rounded,
+              active: isBusy,
+              onPressed: isBusy ? () {} : controller.refreshEngineStatus,
+            );
+          }),
+          Obx(() {
+            final service = controller.engineClientService;
+            final status = service.engineStatus.value;
+            final isStarting = service.isStartingEngine.value;
+            final isStopping = service.isStoppingEngine.value;
+            final isBusy = isStarting || isStopping || status.isChecking;
+            final isOnline = status.isOnline;
+
+            return _TopBarActionButton(
+              tooltip: isOnline
+                  ? AppStrings.stopEngineTooltip
+                  : AppStrings.startEngineTooltip,
+              icon: isBusy
+                  ? Icons.sync_rounded
+                  : isOnline
+                  ? Icons.stop_circle_rounded
+                  : Icons.play_arrow_rounded,
+              active: isOnline || isStarting || isStopping,
+              onPressed: isBusy ? () {} : controller.toggleRustEngine,
             );
           }),
           _TopBarActionButton(

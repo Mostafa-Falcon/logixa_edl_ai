@@ -1364,3 +1364,373 @@ Step 14 — Real Chat Page Skeleton:
 - استبدال ChatPage placeholder بشاشة شات مبدئية.
 - إرسال prompt إلى `/runtime/chat`.
 - عرض response lifecycle message مؤقتًا بدون تشغيل GGUF فعلي.
+
+---
+
+## Step 14 — Real Chat Page Skeleton
+
+### الهدف
+تنفيذ الخطوة التالية من `todo.md` بدون تعديل `README.md`:
+- تحويل `ChatPage` من Placeholder إلى شاشة شات مبدئية.
+- إضافة Messages list.
+- إضافة Text input وزر إرسال.
+- دعم اختيار Profile يدويًا أو استخدام البروفايل النشط.
+- إرسال الطلب إلى Rust Engine عبر `POST /runtime/chat`.
+- عرض lifecycle response مؤقتًا فقط.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع العالي.
+- تمت مراجعة `did.md` كسجل تنفيذ.
+- تمت مراجعة `todo.md` باعتباره خريطة التنفيذ الحالية.
+- الخطوة متوافقة مع Step 14 في `todo.md`.
+- لم يتم تعديل `README.md`.
+
+### ما تم تنفيذه
+- إضافة route حقيقي لصفحة الشات:
+  - `/chat-page`
+- ربط زر الشات في Home Sidebar بفتح صفحة الشات.
+- استبدال Placeholder داخل `ChatPageView` بواجهة شات مبدئية منظمة.
+- إضافة `ChatPageController` لإدارة:
+  - الرسائل.
+  - حقل الإدخال.
+  - حالة الإرسال.
+  - اختيار البروفايل المستخدم.
+  - إرسال الرسالة إلى Rust Runtime.
+- إضافة موديل خفيف للرسائل:
+  - `ChatMessageModel`
+- إضافة method داخل `EngineClientService`:
+  - `sendRuntimeChat(...)`
+- إضافة نتيجة runtime خفيفة:
+  - `EngineRuntimeChatResult`
+- إضافة أقسام UI صغيرة بدل ملف واحد كبير:
+  - `ChatHeaderSection`
+  - `ChatProfileSelectorSection`
+  - `ChatMessagesSection`
+  - `ChatInputSection`
+- إضافة reusable bubble للرسائل:
+  - `ReusableChatBubble`
+- عند اختيار بروفايل يدويًا قبل الإرسال:
+  - يتم تعيينه كبروفايل نشط محليًا.
+  - يتم محاولة مزامنته مع Rust عبر `/runtime/profile`.
+  - لا يحدث كراش لو Rust Engine غير متصل.
+- عند إرسال الرسالة:
+  - يتم إرسال `prompt` و`system_prompt` إلى `/runtime/chat`.
+  - يتم عرض lifecycle response فقط.
+
+### الملفات التي تم تعديلها
+- `lib/app/routes/app_pages.dart`
+- `lib/app/routes/app_routes.dart`
+- `lib/app/modules/home/controllers/home_controller.dart`
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/chat_page/controllers/chat_page_controller.dart`
+- `lib/app/modules/chat_page/views/chat_page_view.dart`
+- `lib/app/modules/chat_page/bindings/chat_page_binding.dart`
+- `lib/app/constants/app_strings.dart`
+- `did.md`
+
+### الملفات التي تم إضافتها
+- `lib/app/data/models/chat_message_model.dart`
+- `lib/app/modules/chat_page/views/sections/chat_header_section.dart`
+- `lib/app/modules/chat_page/views/sections/chat_profile_selector_section.dart`
+- `lib/app/modules/chat_page/views/sections/chat_messages_section.dart`
+- `lib/app/modules/chat_page/views/sections/chat_input_section.dart`
+- `lib/app/widgets/reusable_widgets/reusable_chat_bubble.dart`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تشغيل GGUF فعليًا.
+- لم يتم تنفيذ Streaming.
+- لم يتم تنفيذ Tools.
+- لم يتم تنفيذ Memory auto-save؛ مكانه Step 15.
+- لم يتم تنفيذ Runtime GGUF Adapter أو llama.cpp.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter pub get
+flutter analyze
+flutter run -d linux
+```
+
+مع تشغيل Rust Engine في Terminal منفصل أو باستخدام:
+
+```bash
+./scripts/dev.sh
+```
+
+أو يدويًا:
+
+```bash
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+اختبار يدوي مقترح:
+- افتح التطبيق.
+- افتح الشات من الـ Sidebar.
+- اختار بروفايل Gemma 4B أو البروفايل النشط.
+- اكتب رسالة قصيرة واضغط إرسال.
+- المفروض تظهر رسالة lifecycle response بدون تشغيل GGUF حقيقي.
+
+### الخطوة القادمة حسب todo.md
+Step 15 — Auto-save Chat To Rust Memory:
+- إنشاء conversation عند أول رسالة.
+- حفظ رسالة المستخدم في SQLite Memory.
+- حفظ رد Runtime/Assistant في SQLite Memory.
+- إضافة metadata بدون تشغيل GGUF حقيقي.
+
+---
+
+## Step 14 — UI Alignment Hotfix / Runtime Layout Fix
+
+### السبب
+بعد تشغيل Step 14 ظهر أن التنفيذ الأول لم يحقق شرط الاستقرار البصري بنسبة 100%:
+- صفحة الشات كانت مختلفة بصريًا عن أسلوب Home/Workspace.
+- `ChatProfileSelectorSection` تسبب في RenderFlex overflow داخل Linux desktop.
+- `scripts/dev.sh` كان يحتاج إعادة كتابة آمنة بسطور صحيحة وتشغيل مباشر.
+- ظهر lint بسيط بسبب استخدام underscores متعددة.
+
+### القاعدة
+هذه ليست Step 15.
+هذه مراجعة وتصحيح لنفس Step 14 قبل اعتمادها.
+لم يتم تعديل `README.md`.
+لم يتم تشغيل GGUF.
+لم يتم إضافة Streaming أو Tools أو Memory auto-save.
+
+### ما تم تعديله
+- إعادة تنظيم `ChatPageView` إلى layout موحد:
+  - Header.
+  - Profile selector أفقي compact.
+  - Messages area.
+  - Input area.
+- إزالة الـ fixed right sidebar الذي سبب الضغط والـ overflow.
+- جعل `ChatProfileSelectorSection` responsive باستخدام `LayoutBuilder` و`Wrap` بدل Column طويلة مع Spacer.
+- إصلاح lint `unnecessary_underscores` في `ChatMessagesSection`.
+- إعادة كتابة `scripts/dev.sh` بصيغة Bash سليمة قابلة للتشغيل، مع fallback لو `curl` غير متاح.
+
+### الملفات المعدلة
+- `lib/app/modules/chat_page/views/chat_page_view.dart`
+- `lib/app/modules/chat_page/views/sections/chat_profile_selector_section.dart`
+- `lib/app/modules/chat_page/views/sections/chat_messages_section.dart`
+- `scripts/dev.sh`
+- `did.md`
+
+### الفحص المطلوب
+```bash
+flutter analyze
+flutter run -d linux
+./scripts/dev.sh
+```
+
+### شرط اعتماد Step 14
+لا يتم الانتقال إلى Step 15 إلا بعد:
+- عدم وجود RenderFlex overflow.
+- `flutter analyze` يعرض `No issues found!`.
+- زر الشات يفتح صفحة موحدة بصريًا.
+- اختيار البروفايل موجود.
+- الإرسال إلى `/runtime/chat` يعمل كـ lifecycle response فقط.
+
+
+---
+
+## Step 14 Hotfix — توحيد الـ Navigation Shell قبل اعتماد الخطوة
+
+### الهدف
+تصحيح Step 14 قبل الانتقال لأي خطوة جديدة، بعد ظهور عدم اتساق واضح بين الصفحات في شريط التنقل الجانبي، وظهور صفحة الشات بتخطيط مختلف عن Home وSettings وWorkspace.
+
+### ما تم تنفيذه
+- إنشاء Navigation رئيسي موحد reusable لكل الصفحات:
+  - `AppMainNavigation`
+- نقل مسؤولية عرض شريط التنقل الرئيسي إلى `CorePage` بدل تكرارها داخل كل صفحة.
+- توحيد ظهور الـ Activity Bar في:
+  - Home
+  - Workspace
+  - Chat
+  - Settings
+- إزالة تكرار الـ Navigation المحلي من الصفحات:
+  - `HomeSidebar`
+  - `WorkspaceActivityBar`
+  - شريط Settings اليدوي داخل `SettingsView`
+- الإبقاء على Workspace panels كمنطقة عمل داخلية فقط، وليس Navigation رئيسي مستقل.
+- عدم إضافة أي Feature جديدة خارج تصحيح Step 14.
+
+### الملفات التي تم تعديلها
+- `lib/app/widgets/core_page.dart`
+- `lib/app/modules/home/views/home_view.dart`
+- `lib/app/modules/work_space/views/work_space_view.dart`
+- `lib/app/modules/settings/views/settings_view.dart`
+- `did.md`
+
+### الملفات التي تم إضافتها
+- `lib/app/widgets/app_core/view/sections/app_main_navigation.dart`
+
+### الملفات التي تم حذفها
+- `lib/app/modules/home/views/sections/home_sidebar.dart`
+- `lib/app/modules/work_space/views/sections/workspace_activity_bar.dart`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تنفيذ Step 15.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Streaming.
+- لم يتم تنفيذ Tools.
+- لم يتم تغيير سياسة تشغيل الموديل.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+اختبار يدوي مطلوب قبل اعتماد Step 14:
+- افتح Home وتأكد أن الشريط الجانبي ظاهر بنفس الشكل.
+- افتح Chat وتأكد أن الشريط الجانبي ظاهر بنفس الشكل.
+- افتح Settings وتأكد أن الشريط الجانبي ظاهر بنفس الشكل.
+- افتح Workspace وتأكد أن الشريط الجانبي الرئيسي لم يعد متكررًا أو مختلفًا، وأن Explorer/Editor ما زالوا ظاهرين.
+- تأكد من عدم وجود RenderFlex overflow.
+
+### الحالة
+Step 14 ما زالت في وضع التصحيح/الاعتماد، ولا يتم الانتقال إلى Step 15 إلا بعد تأكيد الشاشة والفحوصات.
+
+---
+
+## Step 14 Hotfix — Flutter Shell Cleanup قبل اعتماد Step 14
+
+### السبب
+بعد تشغيل Step 14 وتصحيح الـ Navigation ظهر أن اعتماد الخطوة غير مقبول بصريًا ووظيفيًا قبل تنظيف الـ Flutter Shell:
+- زر/قسم الطرفية كان ظاهرًا في الـ Main Navigation رغم أن الطرفية جزء داخلي من Workspace/Code page.
+- إعدادات/اختيار الموديل ظهرت داخل الشات رغم أن مصدر إعدادات الموديل يجب أن يكون Settings.
+- تحديث حالة Rust Engine ظهر في أكثر من مكان بدل أن يكون مصدره الشريط العلوي.
+- Workspace Bottom Panel أظهر RenderFlex overflow بسيط في Linux بسبب ارتفاع الـ collapsed panel.
+
+### القرار
+هذه ليست Step 15، ولا يتم الانتقال لأي خطوة جديدة.
+هذا تصحيح اعتماد لنفس Step 14 حتى يصبح الـ UI موحدًا ومستقرًا.
+
+### ما تم تنفيذه
+- توحيد الـ Main Navigation ليعرض فقط الصفحات الحقيقية الحالية:
+  - الرئيسية.
+  - مساحة العمل.
+  - الشات.
+  - الإعدادات.
+- إزالة عناصر الـ Navigation غير المكتملة/المكررة:
+  - الطرفية من الـ main bar.
+  - الداتا من الـ main bar.
+  - الحساب من الـ main bar.
+- نقل التحكم العملي في Rust Engine إلى الشريط العلوي:
+  - لو المحرك Offline يظهر زر تشغيل من الـ Top Bar.
+  - لو المحرك Online يتحول الزر إلى تحديث الحالة.
+- إضافة تشغيل Rust Engine من Flutter عبر `cargo run` داخل `logixa_engine` بدون تشغيل GGUF.
+- إزالة زر تحديث الحالة من صفحة الشات.
+- إزالة اختيار/إعدادات الموديل من صفحة الشات، والاعتماد على البروفايل النشط من Settings عند الإرسال.
+- إبقاء Settings كمكان عرض وتعديل إعدادات الموديل.
+- إبقاء EngineStatusSection في Settings كعرض تفصيلي فقط، بدون زر تحديث مكرر.
+- زيادة ارتفاع Workspace Bottom Panel collapsed لتفادي overflow في Linux.
+
+### الملفات التي تم تعديلها
+- `lib/app/widgets/app_core/view/sections/app_main_navigation.dart`
+- `lib/app/widgets/app_core/controller/top_bar_controller.dart`
+- `lib/app/widgets/app_core/view/sections/top_bar_actions_section.dart`
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/chat_page/controllers/chat_page_controller.dart`
+- `lib/app/modules/chat_page/views/chat_page_view.dart`
+- `lib/app/modules/chat_page/views/sections/chat_header_section.dart`
+- `lib/app/modules/settings/views/sections/engine_status_section.dart`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/constants/app_sizes.dart`
+- `did.md`
+
+### الملفات التي تم حذفها
+- `lib/app/modules/chat_page/views/sections/chat_profile_selector_section.dart`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تنفيذ Step 15.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Streaming.
+- لم يتم تنفيذ Tools.
+- لم يتم تنفيذ Memory auto-save.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+اختبار يدوي قبل اعتماد Step 14:
+- افتح Home وتأكد أن الـ navigation موحد.
+- افتح Workspace وتأكد أن الطرفية ليست في الشريط الجانبي الرئيسي، وأنها موجودة فقط داخل Bottom Panel.
+- افتح Chat وتأكد أن الشات لا يحتوي إعدادات موديل ولا زر تحديث حالة.
+- افتح Settings وتأكد أن إعدادات الموديل موجودة هناك فقط.
+- اضغط زر Rust Engine في الشريط العلوي والمحرك Offline، وتأكد أنه يحاول تشغيل Rust Engine.
+- تأكد من عدم وجود RenderFlex overflow.
+
+### الحالة
+Step 14 ما زالت تحت الاعتماد، ولا يتم عمل commit/tag إلا بعد تأكيد مصطفى أن الواجهة أصبحت موحدة ومستقرة 100%.
+
+---
+
+## Step 14 Hotfix — Rust Engine Toggle + إيقاف المحرك عند إغلاق التطبيق
+
+### السبب
+بعد اعتماد شكل الـ Flutter Shell ظهر أن Rust Engine كان يفضل شغال بعد إغلاق التطبيق. هذا غير مقبول لأن التحكم في المحرك يجب أن يكون من الواجهة نفسها، وليس من Terminal أو `dev.sh`.
+
+### القرار
+لا يتم الانتقال إلى Step 15. هذا تصحيح أخير داخل Step 14 حتى يصبح التحكم في Rust Engine واضحًا ومغلقًا داخل الـ Top Bar.
+
+### ما تم تنفيذه
+- فصل أزرار Rust Engine في الـ Top Bar إلى:
+  - زر تحديث حالة مستقل.
+  - زر Toggle مستقل لتشغيل/إيقاف Rust Engine.
+- عند Offline يظهر زر تشغيل Rust Engine.
+- عند Online يتحول الزر إلى إيقاف Rust Engine.
+- إضافة حالة `isStoppingEngine` حتى تظهر حالة الإيقاف ولا يتم الضغط أثناء العملية.
+- تغيير تشغيل Rust Engine من `cargo run` إلى:
+  - `cargo build` أولًا.
+  - تشغيل binary مباشرة من `logixa_engine/target/debug/logixa_engine`.
+  هذا يجعل العملية التي يشغلها Flutter قابلة للإيقاف المباشر بدل ترك child process شغال بعد إغلاق التطبيق.
+- إضافة fallback على Linux/macOS لإيقاف العملية المرتبطة ببورت `8787` لو كانت عملية قديمة بدأت من نسخة سابقة أو خارج التطبيق.
+- عند إغلاق التطبيق من زر الإغلاق أو حدث إغلاق النافذة يتم إيقاف Rust Engine قبل تدمير النافذة.
+- إضافة `setPreventClose(true)` حتى يمر الإغلاق عبر مسار تنظيف واحد.
+- تحديث Chat binding لضمان توفر `TopBarController` لو تم فتح صفحة الشات مباشرة.
+- حذف `scripts/dev.sh` لأن التشغيل المعتمد أصبح من Flutter Top Bar بدل Terminal runner.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/widgets/app_core/controller/top_bar_controller.dart`
+- `lib/app/widgets/app_core/view/sections/top_bar_actions_section.dart`
+- `lib/app/modules/chat_page/bindings/chat_page_binding.dart`
+- `lib/app/constants/app_strings.dart`
+- `lib/main.dart`
+- `did.md`
+
+### الملفات التي تم حذفها
+- `scripts/dev.sh`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تنفيذ Step 15.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Streaming.
+- لم يتم تنفيذ Tools.
+- لم يتم تنفيذ Memory auto-save.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+اختبار يدوي قبل اعتماد Step 14:
+- افتح التطبيق والمحرك Offline.
+- اضغط زر التشغيل من الشريط العلوي وتأكد أن Rust Engine يصبح Online.
+- اضغط زر الإيقاف من الشريط العلوي وتأكد أن Rust Engine يصبح Offline.
+- شغل المحرك مرة أخرى، ثم اقفل التطبيق من زر الإغلاق.
+- افتح التطبيق مرة ثانية وتأكد أن Rust Engine لا يزال Offline إلا لو شغلته يدويًا.
+- استخدم زر تحديث الحالة للتأكد من القراءة فقط.
+
+### الحالة
+Step 14 ما زالت تحت الاعتماد النهائي. لا commit/tag إلا بعد نجاح الفحص اليدوي أعلاه.

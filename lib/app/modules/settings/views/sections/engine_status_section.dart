@@ -6,7 +6,6 @@ import '../../../../constants/app_colors.dart';
 import '../../../../constants/app_sizes.dart';
 import '../../../../constants/app_strings.dart';
 import '../../../../data/services/engine_client_service.dart';
-import '../../../../widgets/reusable_widgets/reusable_button.dart';
 import '../../../../widgets/reusable_widgets/reusable_status_badge.dart';
 import '../../../../widgets/reusable_widgets/reusable_surface_card.dart';
 import '../../../../widgets/reusable_widgets/reusable_text.dart';
@@ -22,12 +21,15 @@ class EngineStatusSection extends StatelessWidget {
       padding: EdgeInsets.all(AppSizes.xl.w),
       child: Obx(() {
         final status = engineClientService.engineStatus.value;
-        final statusLabel = status.isChecking
+        final isStarting = engineClientService.isStartingEngine.value;
+        final statusLabel = isStarting
+            ? 'تشغيل المحرك'
+            : status.isChecking
             ? AppStrings.engineChecking
             : status.isOnline
             ? AppStrings.engineOnline
             : AppStrings.engineOffline;
-        final statusColor = status.isChecking
+        final statusColor = isStarting || status.isChecking
             ? AppColors.runtimeBusy
             : status.isOnline
             ? AppColors.runtimeRunning
@@ -44,7 +46,9 @@ class EngineStatusSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppSizes.radiusLg.r),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.28)),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.28),
+                    ),
                   ),
                   child: Icon(
                     Icons.router_rounded,
@@ -58,7 +62,9 @@ class EngineStatusSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ReusableText.title(text: AppStrings.engineStatusTitle),
-                      ReusableText.body(text: AppStrings.engineStatusDescription),
+                      ReusableText.body(
+                        text: AppStrings.engineStatusDescription,
+                      ),
                     ],
                   ),
                 ),
@@ -68,13 +74,6 @@ class EngineStatusSection extends StatelessWidget {
                   icon: status.isOnline
                       ? Icons.check_circle_rounded
                       : Icons.error_outline_rounded,
-                ),
-                SizedBox(width: AppSizes.md.w),
-                ReusableButton(
-                  title: AppStrings.engineRefreshButton,
-                  icon: Icons.sync_rounded,
-                  isLoading: status.isChecking,
-                  onPressed: () => engineClientService.refreshEngineStatus(),
                 ),
               ],
             ),
@@ -105,7 +104,9 @@ class EngineStatusSection extends StatelessWidget {
                 ),
                 _EngineStatusItem(
                   label: AppStrings.engineActiveProfileLabel,
-                  value: status.activeModelProfileId ?? AppStrings.engineNoActiveProfile,
+                  value:
+                      status.activeModelProfileId ??
+                      AppStrings.engineNoActiveProfile,
                 ),
                 _EngineStatusItem(
                   label: AppStrings.engineUptimeLabel,
@@ -131,7 +132,9 @@ class EngineStatusSection extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.errorSoft.withValues(alpha: 0.48),
                   borderRadius: BorderRadius.circular(AppSizes.radiusMd.r),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.22)),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.22),
+                  ),
                 ),
                 child: ReusableText.body(
                   text: status.errorMessage!,
