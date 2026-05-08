@@ -1095,3 +1095,113 @@ Step 12 — Sync Local Model Settings to Rust:
 - عند حفظ إعدادات الموديل من Flutter يتم إرسالها إلى `/runtime/profile`.
 - عند حفظ System Prompt يتم إرسالها إلى `/runtime/system-prompt`.
 - معالجة فشل الاتصال بدون كراش.
+
+---
+
+## Step 12 — Sync Local Model Settings to Rust
+
+### الهدف
+تنفيذ الخطوة التالية من `todo.md` بدون تعديل `README.md`:
+- مزامنة إعدادات الموديل المحلي من Flutter إلى Rust Engine عند الحفظ.
+- مزامنة System Prompt من Flutter إلى Rust Engine عند الحفظ أو الاستعادة.
+- إضافة الحقول الناقصة قبل تشغيل GGUF الحقيقي حتى يكون بروفايل الموديل كاملًا.
+- الحفاظ على Flutter `GetStorage` كـ UI cache، مع جعل Rust Engine هو مصدر الحقيقة التدريجي للإعدادات المهمة.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع العالي.
+- تمت مراجعة `did.md` الحالي قبل التنفيذ.
+- تمت مراجعة `todo.md` باعتباره خريطة التنفيذ الحالية بعد المراجعة.
+- الخطوة متوافقة مع Step 12 في `todo.md`.
+- لم يتم تعديل `README.md`.
+
+### ما تم تنفيذه في Flutter
+- تحديث `EngineClientService` لإضافة عمليات مزامنة مباشرة مع Rust Engine:
+  - `syncRuntimeProfile(...)` لإرسال إعدادات الموديل إلى `POST /runtime/profile`.
+  - `syncSystemPrompt(...)` لإرسال السيستم برومبت إلى `POST /runtime/system-prompt`.
+- إضافة نتيجة مزامنة خفيفة داخل نفس ملف الخدمة:
+  - `EngineSyncResult`
+- تحديث `SettingsController` بحيث:
+  - عند حفظ إعدادات الموديل يتم الحفظ محليًا أولًا ثم إرسالها إلى Rust Engine.
+  - عند حفظ System Prompt يتم الحفظ محليًا أولًا ثم إرسالها إلى Rust Engine.
+  - عند استعادة System Prompt الافتراضي يتم مزامنته مع Rust Engine أيضًا.
+  - لو Rust Engine غير متصل، يتم حفظ الإعدادات محليًا فقط مع رسالة واضحة بدون كراش.
+- إضافة الحقول الناقصة إلى `ModelProfileModel`:
+  - `repeatPenalty`
+  - `presencePenalty`
+  - `promptTemplate`
+  - `modelRole`
+  - `loadPolicy`
+  - `ramPolicy`
+- تحديث صفحة إعدادات البروفايل النشط لإظهار الحقول الجديدة.
+- إضافة نصوص جديدة داخل `AppStrings` لرسائل المزامنة وحقول الإعدادات الجديدة.
+
+### ما تم تنفيذه في Rust Engine
+- تحديث `ModelProfileConfig` لدعم الحقول الجديدة:
+  - `repeat_penalty`
+  - `presence_penalty`
+  - `prompt_template`
+  - `model_role`
+  - `load_policy`
+  - `ram_policy`
+- إضافة defaults وnormalization لهذه الحقول داخل Rust.
+- إصلاح تكرار حقل `model_profile` داخل `RuntimeProfileResponse` في `routes.rs`.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/models/model_profile_model.dart`
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/settings/controllers/settings_controller.dart`
+- `lib/app/modules/settings/views/sections/active_model_profile_form_section.dart`
+- `lib/app/constants/app_strings.dart`
+- `logixa_engine/src/model_profile.rs`
+- `logixa_engine/src/routes.rs`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تشغيل GGUF فعليًا.
+- لم يتم تنفيذ Chat UI.
+- لم يتم تنفيذ Memory auto-save.
+- لم يتم تنفيذ بروفايلات Gemma الجاهزة؛ مكانها Step 13.
+- لم يتم جعل Flutter يشغل Rust Engine تلقائيًا؛ هذا قرار/خطوة منفصلة لاحقًا.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter pub get
+flutter analyze
+flutter run -d linux
+```
+
+مع تشغيل Rust Engine في Terminal منفصل:
+
+```bash
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+### اختبار يدوي مقترح
+- افتح Settings.
+- عدّل أي قيمة في Model Profile.
+- اضغط حفظ الإعدادات.
+- لو Rust Engine شغال، المفروض تظهر رسالة مزامنة ناجحة.
+- افحص Rust:
+
+```bash
+curl -s http://127.0.0.1:8787/settings | python3 -m json.tool
+```
+
+وتأكد أن `active_model_profile` يحتوي على:
+
+```text
+repeat_penalty
+presence_penalty
+prompt_template
+model_role
+load_policy
+ram_policy
+```
+
+### الخطوة القادمة حسب todo.md
+Step 13 — Local Model Profiles Presets:
+- إضافة Action لإنشاء بروفايلات Gemma 4B Fast وGemma 12B Quality بدون تشغيل موديل حقيقي.
