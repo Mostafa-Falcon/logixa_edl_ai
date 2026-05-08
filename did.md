@@ -2114,3 +2114,138 @@ flutter run -d linux
 
 ### الحالة
 جاهزة للفحص والاعتماد بعد نجاح `flutter analyze` والتجربة اليدوية.
+
+---
+
+## Step 19 — Real Terminal
+
+### الهدف
+تحويل تبويب Terminal في اللوحة السفلية من placeholder إلى طرفية حقيقية مبدئية داخل Workspace الحالي باستخدام `xterm` و `flutter_pty`.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع الأعلى ولم يتم تعديله.
+- تمت مراجعة `did.md` لمعرفة آخر نقطة: Step 18 Context Menu جاهزة وتم فحصها واعتمادها من مصطفى قبل طلب Step 19.
+- تمت مراجعة `todo.md` وتحديد نطاق Step 19 فقط.
+
+### ما تم تنفيذه
+- إضافة طرفية حقيقية داخل Bottom Panel / Terminal باستخدام `TerminalView` من `xterm`.
+- تشغيل shell محلي باستخدام `Pty.start` من `flutter_pty`.
+- تشغيل الطرفية داخل `activeWorkspace.path` عبر `workingDirectory`.
+- إضافة أزرار آمنة في واجهة الطرفية:
+  - تشغيل.
+  - إيقاف.
+  - إعادة تشغيل.
+- منع إدخال المستخدم في الطرفية عندما تكون متوقفة عبر `readOnly`.
+- ربط إدخال `xterm` بعملية `flutter_pty` بدون تشغيل أوامر تلقائيًا.
+- ربط خرج `flutter_pty` بالـ `TerminalView` مع UTF-8 decoder آمن.
+- ضبط resize مبدئي بين `xterm` و `pty`.
+- تنظيف العملية عند إغلاق Controller حتى لا تبقى عملية terminal معلقة.
+- نقل نصوص الطرفية الجديدة إلى `AppStrings`.
+- فصل واجهة الطرفية في ملف مستقل للحفاظ على تنظيم Workspace UI.
+
+### الملفات المعدلة
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/work_space/controllers/work_space_controller.dart`
+- `lib/app/modules/work_space/views/sections/workspace_bottom_panel.dart`
+- `lib/app/modules/work_space/views/sections/workspace_terminal_panel.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تشغيل أوامر تلقائيًا داخل الطرفية.
+- لم يتم تنفيذ Terminal command presets.
+- لم يتم تنفيذ auto-run لأي أمر بناء أو تحليل.
+- لم يتم تعديل Rust Engine.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Code Editor الحقيقي.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب
+- افتح Workspace.
+- افتح تبويب Terminal من اللوحة السفلية.
+- اضغط تشغيل.
+- اكتب:
+  - `pwd`
+  - `ls`
+- تأكد أن `pwd` يطابق مسار الـ Workspace المفتوح.
+- اضغط إيقاف وتأكد أن الإدخال يتوقف.
+- اضغط إعادة تشغيل وتأكد أن الطرفية تعمل من جديد.
+
+### الحالة
+جاهزة للفحص والاعتماد بعد نجاح `flutter analyze` والتجربة اليدوية.
+
+
+---
+
+## Step 19 Fix — xterm 4 import + analyzer cleanup
+
+Goal:
+Fix Step 19 build/analyzer issues after applying the real workspace terminal patch.
+
+What changed:
+- Updated the terminal view import from the removed `package:xterm/flutter.dart` entrypoint to `package:xterm/xterm.dart`, which exports `TerminalView` in xterm 4.0.0.
+- Removed the unnecessary `dart:typed_data` import from `WorkSpaceController`.
+- Removed the unused optional constructor parameter from the private `_TerminalShell` helper while preserving the shell argument list used by `Pty.start`.
+
+Files changed:
+- `lib/app/modules/work_space/views/sections/workspace_terminal_panel.dart`
+- `lib/app/modules/work_space/controllers/work_space_controller.dart`
+- `did.md`
+
+Scope control:
+- No README edits.
+- No todo edits.
+- No Rust Engine changes.
+- No GGUF changes.
+- No terminal behavior expansion beyond fixing Step 19 compile/analyzer errors.
+
+Checks to run:
+- `flutter analyze`
+- `flutter run -d linux`
+
+Next step:
+- If checks pass and the terminal opens inside the active workspace, commit/tag Step 19.
+
+---
+
+## Step 19 Fix — Terminal panel overflow guard
+
+Goal:
+Fix the runtime render overflow that appeared after Step 19 when the bottom panel body briefly receives a very small height during layout/animation.
+
+What changed:
+- Added a `LayoutBuilder` guard to `WorkspaceTerminalPanel` so the terminal body does not render its toolbar/view while the available height is below the safe minimum.
+- Wrapped the terminal column with `ClipRect` for safer animated/collapsed panel rendering.
+- Preserved the existing terminal behavior, xterm integration, flutter_pty wiring, and workspace working-directory logic.
+
+Files changed:
+- `lib/app/modules/work_space/views/sections/workspace_terminal_panel.dart`
+- `did.md`
+
+Scope control:
+- No README edits.
+- No todo edits.
+- No Rust Engine changes.
+- No GGUF changes.
+- No terminal command behavior expansion.
+- No new packages.
+
+Checks to run:
+- `flutter analyze`
+- `flutter run -d linux`
+
+Manual test:
+- Open a Workspace.
+- Open the Terminal bottom tab.
+- Press تشغيل.
+- Run `pwd` and confirm it matches the workspace path.
+- Collapse/open the bottom panel and confirm no RenderFlex overflow appears.
+
+Next step:
+- If checks pass and no overflow appears, commit/tag Step 19.

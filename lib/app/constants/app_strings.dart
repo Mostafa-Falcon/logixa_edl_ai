@@ -337,10 +337,34 @@ class AppStrings {
   static const String workspaceBottomPanelOutput = 'Output';
   static const String workspaceBottomPanelToggle = 'إظهار/إخفاء اللوحة السفلية';
   static const String workspaceBottomPanelClearLogs = 'مسح اللوجات';
-  static const String workspaceTerminalPlaceholderTitle =
-      'الطرفية المحلية جاهزة كمساحة مبدئية';
-  static const String workspaceTerminalPlaceholderMessage =
-      'التشغيل الحقيقي للـ Terminal باستخدام xterm و flutter_pty مؤجل لخطوة مستقلة عشان ما نكسرش الاستقرار الحالي.';
+  static const String workspaceTerminalStart = 'تشغيل';
+  static const String workspaceTerminalStop = 'إيقاف';
+  static const String workspaceTerminalRestart = 'إعادة تشغيل';
+  static const String workspaceTerminalRunning = 'الطرفية تعمل';
+  static const String workspaceTerminalStopped = 'الطرفية متوقفة';
+  static const String workspaceTerminalStarting = 'جاري تشغيل الطرفية';
+  static const String workspaceTerminalStopping = 'جاري إيقاف الطرفية';
+  static const String workspaceTerminalFailed = 'تعذر تشغيل الطرفية';
+  static const String workspaceTerminalNoWorkspace =
+      'افتح Workspace أولًا قبل تشغيل الطرفية.';
+  static const String workspaceTerminalNoWorkspaceTitle =
+      'الطرفية محتاجة مساحة عمل';
+  static const String workspaceTerminalNoWorkspaceMessage =
+      'افتح مجلد مشروع من الصفحة الرئيسية، وبعدها شغّل الطرفية من هنا.';
+  static const String workspaceTerminalWorkingDirectory = 'المسار:';
+  static const String workspaceTerminalWorkingDirectoryPending =
+      'لم يتم تشغيل الطرفية بعد';
+  static const String workspaceTerminalStartingBanner =
+      '[Logixa Terminal] starting in';
+  static const String workspaceTerminalStoppedBanner =
+      '[Logixa Terminal] stopped';
+  static const String workspaceTerminalStartedLogPrefix =
+      'تم تشغيل الطرفية داخل';
+  static const String workspaceTerminalStoppedLog = 'تم إيقاف الطرفية.';
+  static const String workspaceTerminalStartFailedPrefix = 'فشل تشغيل الطرفية:';
+  static const String workspaceTerminalOutputErrorPrefix =
+      'خطأ في خرج الطرفية:';
+  static const String workspaceTerminalExitedPrefix = 'انتهت الطرفية بكود خروج';
   static const String workspaceLogsEmpty = 'لا توجد لوجات لمساحة العمل بعد.';
   static const String workspaceProblemsEmpty = 'لا توجد مشاكل مرصودة حاليًا.';
   static const String workspaceOutputSummary = 'ملخص مساحة العمل';

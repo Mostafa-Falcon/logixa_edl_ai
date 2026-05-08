@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-
 import 'package:flutter/services.dart';
+import 'package:flutter_pty/flutter_pty.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:path/path.dart' as path;
+import 'package:xterm/xterm.dart';
 
 import '../../../constants/app_strings.dart';
 import '../../../data/models/opened_file_model.dart';
@@ -21,6 +22,8 @@ enum WorkSpaceBottomPanel { terminal, logs, problems, output }
 class WorkSpaceController extends GetxController {
   static const String _activeWorkspaceStorageKey = 'active_workspace';
   static const int _maxPreviewBytes = 512 * 1024;
+  static const int _terminalRows = 24;
+  static const int _terminalColumns = 100;
 
   static const String _eventWorkspaceRefreshed = 'workspace_refreshed';
   static const String _eventWorkspaceLoaded = 'workspace_loaded';
@@ -42,6 +45,15 @@ class WorkSpaceController extends GetxController {
 
   final GetStorage _storage = GetStorage();
 
+  late final Terminal terminal = Terminal(
+    maxLines: 2000,
+    onOutput: _handleTerminalInput,
+    onResize: _handleTerminalResize,
+  );
+
+  Pty? _terminalPty;
+  StreamSubscription<Uint8List>? _terminalOutputSubscription;
+
   final activeWorkspace = Rxn<WorkspaceModel>();
   final workspaceFiles = <WorkspaceFileItemModel>[].obs;
   final expandedDirectoryPaths = <String>{}.obs;
@@ -52,6 +64,10 @@ class WorkSpaceController extends GetxController {
   final isBottomPanelVisible = true.obs;
   final isSyncingWorkspaceSession = false.obs;
   final lastWorkspaceSessionId = ''.obs;
+  final isTerminalRunning = false.obs;
+  final isTerminalStarting = false.obs;
+  final terminalStatusMessage = AppStrings.workspaceTerminalStopped.obs;
+  final terminalWorkingDirectory = ''.obs;
 
   final isLoading = false.obs;
   final errorMessage = ''.obs;
@@ -122,6 +138,12 @@ class WorkSpaceController extends GetxController {
     _loadActiveWorkspace();
   }
 
+  @override
+  void onClose() {
+    _disposeTerminalProcess();
+    super.onClose();
+  }
+
   Future<void> refreshWorkspace() async {
     final workspace = activeWorkspace.value;
     if (workspace == null) return;
@@ -145,6 +167,99 @@ class WorkSpaceController extends GetxController {
   void clearWorkspaceLogs() {
     workspaceLogs.clear();
     _pushWorkspaceLog(AppStrings.workspaceLogsCleared);
+  }
+
+  Future<void> startTerminal() async {
+    if (isTerminalRunning.value || isTerminalStarting.value) return;
+
+    final workspace = activeWorkspace.value;
+    if (workspace == null) {
+      terminalStatusMessage.value = AppStrings.workspaceTerminalNoWorkspace;
+      _pushWorkspaceLog(AppStrings.workspaceTerminalNoWorkspace);
+      return;
+    }
+
+    isTerminalStarting.value = true;
+    terminalWorkingDirectory.value = workspace.path;
+    terminalStatusMessage.value = AppStrings.workspaceTerminalStarting;
+    terminal.write(
+      '\r\n${AppStrings.workspaceTerminalStartingBanner} ${workspace.path}\r\n',
+    );
+
+    try {
+      final shell = _resolveTerminalShell();
+      final pty = Pty.start(
+        shell.executable,
+        arguments: shell.arguments,
+        workingDirectory: workspace.path,
+        environment: _terminalEnvironment(),
+        rows: _terminalRows,
+        columns: _terminalColumns,
+      );
+
+      _terminalPty = pty;
+      _terminalOutputSubscription = pty.output.listen(
+        _handleTerminalOutput,
+        onError: (Object error) {
+          terminal.write(
+            '\r\n${AppStrings.workspaceTerminalOutputErrorPrefix} $error\r\n',
+          );
+          _pushWorkspaceLog(
+            '${AppStrings.workspaceTerminalOutputErrorPrefix} $error',
+          );
+        },
+      );
+
+      unawaited(
+        pty.exitCode.then((code) {
+          if (_terminalPty != pty) return;
+          _markTerminalStopped(code);
+        }),
+      );
+
+      isTerminalRunning.value = true;
+      terminalStatusMessage.value = AppStrings.workspaceTerminalRunning;
+      _pushWorkspaceLog(
+        '${AppStrings.workspaceTerminalStartedLogPrefix} ${workspace.path}',
+      );
+    } catch (error) {
+      terminalStatusMessage.value = AppStrings.workspaceTerminalFailed;
+      terminal.write(
+        '\r\n${AppStrings.workspaceTerminalStartFailedPrefix} $error\r\n',
+      );
+      _pushWorkspaceLog(
+        '${AppStrings.workspaceTerminalStartFailedPrefix} $error',
+      );
+      _terminalPty = null;
+      await _terminalOutputSubscription?.cancel();
+      _terminalOutputSubscription = null;
+    } finally {
+      isTerminalStarting.value = false;
+    }
+  }
+
+  Future<void> stopTerminal() async {
+    final pty = _terminalPty;
+    if (pty == null) {
+      isTerminalRunning.value = false;
+      terminalStatusMessage.value = AppStrings.workspaceTerminalStopped;
+      return;
+    }
+
+    terminalStatusMessage.value = AppStrings.workspaceTerminalStopping;
+    pty.kill();
+    await _terminalOutputSubscription?.cancel();
+    _terminalOutputSubscription = null;
+    _terminalPty = null;
+    isTerminalRunning.value = false;
+    terminalStatusMessage.value = AppStrings.workspaceTerminalStopped;
+    terminal.write('\r\n${AppStrings.workspaceTerminalStoppedBanner}\r\n');
+    _pushWorkspaceLog(AppStrings.workspaceTerminalStoppedLog);
+  }
+
+  Future<void> restartTerminal() async {
+    await stopTerminal();
+    await startTerminal();
   }
 
   void toggleDirectory(WorkspaceFileItemModel item) {
@@ -330,6 +445,71 @@ class WorkSpaceController extends GetxController {
     );
   }
 
+  void _handleTerminalInput(String data) {
+    final pty = _terminalPty;
+    if (pty == null || !isTerminalRunning.value) return;
+    pty.write(const Utf8Encoder().convert(data));
+  }
+
+  void _handleTerminalOutput(Uint8List data) {
+    final text = const Utf8Decoder(allowMalformed: true).convert(data);
+    terminal.write(text);
+  }
+
+  void _handleTerminalResize(
+    int width,
+    int height,
+    int pixelWidth,
+    int pixelHeight,
+  ) {
+    final pty = _terminalPty;
+    if (pty == null || width <= 0 || height <= 0) return;
+    pty.resize(height, width);
+  }
+
+  void _markTerminalStopped(int code) {
+    _terminalPty = null;
+    unawaited(_terminalOutputSubscription?.cancel());
+    _terminalOutputSubscription = null;
+    isTerminalRunning.value = false;
+    terminalStatusMessage.value =
+        '${AppStrings.workspaceTerminalExitedPrefix} $code';
+    terminal.write('\r\n${AppStrings.workspaceTerminalExitedPrefix} $code\r\n');
+    _pushWorkspaceLog('${AppStrings.workspaceTerminalExitedPrefix} $code');
+  }
+
+  void _disposeTerminalProcess() {
+    _terminalPty?.kill();
+    unawaited(_terminalOutputSubscription?.cancel());
+    _terminalOutputSubscription = null;
+    _terminalPty = null;
+    isTerminalRunning.value = false;
+  }
+
+  _TerminalShell _resolveTerminalShell() {
+    if (Platform.isWindows) {
+      return const _TerminalShell(executable: 'cmd.exe');
+    }
+
+    if (Platform.isMacOS || Platform.isLinux) {
+      final shell = Platform.environment['SHELL'];
+      if (shell != null && shell.trim().isNotEmpty) {
+        return _TerminalShell(executable: shell.trim());
+      }
+      return const _TerminalShell(executable: 'bash');
+    }
+
+    return const _TerminalShell(executable: 'sh');
+  }
+
+  Map<String, String> _terminalEnvironment() {
+    return {
+      ...Platform.environment,
+      'TERM': 'xterm-256color',
+      'COLORTERM': 'truecolor',
+    };
+  }
+
   Future<void> _syncWorkspaceSessionToMemory({
     required String event,
     String? activeFile,
@@ -456,7 +636,9 @@ class WorkSpaceController extends GetxController {
       workspaceFiles.assignAll(items);
       _seedExpandedDirectories(items);
       _pushWorkspaceLog(
-        '${AppStrings.workspaceProjectFilesReadPrefix} ${items.length} ${AppStrings.workspaceProjectFilesReadSuffix}',
+        '${AppStrings.workspaceProjectFilesReadPrefix} '
+        '${items.length} '
+        '${AppStrings.workspaceProjectFilesReadSuffix}',
       );
       await _openDefaultFileIfAvailable();
     } catch (error) {
@@ -576,6 +758,13 @@ class WorkSpaceController extends GetxController {
       workspaceLogs.removeRange(80, workspaceLogs.length);
     }
   }
+}
+
+class _TerminalShell {
+  final String executable;
+  final List<String> arguments = const [];
+
+  const _TerminalShell({required this.executable});
 }
 
 const int _workspaceMaxTreeDepth = 5;

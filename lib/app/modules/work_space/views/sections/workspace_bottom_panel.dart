@@ -9,6 +9,7 @@ import '../../../../constants/app_strings.dart';
 import '../../../../widgets/reusable_widgets/reusable_text.dart';
 import '../../../../widgets/reusable_widgets/reusable_workspace_bottom_tab.dart';
 import '../../controllers/work_space_controller.dart';
+import 'workspace_terminal_panel.dart';
 
 class WorkspaceBottomPanel extends GetView<WorkSpaceController> {
   const WorkspaceBottomPanel({super.key});
@@ -160,7 +161,8 @@ class _WorkspaceBottomIconButton extends StatefulWidget {
       _WorkspaceBottomIconButtonState();
 }
 
-class _WorkspaceBottomIconButtonState extends State<_WorkspaceBottomIconButton> {
+class _WorkspaceBottomIconButtonState
+    extends State<_WorkspaceBottomIconButton> {
   bool _isHovered = false;
 
   @override
@@ -222,7 +224,7 @@ class _WorkspaceBottomPanelBody extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (activePanel) {
       case WorkSpaceBottomPanel.terminal:
-        return const _TerminalPlaceholderPanel();
+        return const WorkspaceTerminalPanel();
       case WorkSpaceBottomPanel.logs:
         return _LogsPanel(logs: logs);
       case WorkSpaceBottomPanel.problems:
@@ -236,34 +238,6 @@ class _WorkspaceBottomPanelBody extends StatelessWidget {
           openedFileName: openedFileName,
         );
     }
-  }
-}
-
-class _TerminalPlaceholderPanel extends StatelessWidget {
-  const _TerminalPlaceholderPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return _BottomPanelPadding(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _PanelTitle(
-            icon: Icons.terminal_rounded,
-            title: AppStrings.workspaceTerminalPlaceholderTitle,
-          ),
-          SizedBox(height: AppSizes.sm.h),
-          const ReusableText.body(
-            text: AppStrings.workspaceTerminalPlaceholderMessage,
-            color: AppColors.textMuted,
-          ),
-          SizedBox(height: AppSizes.lg.h),
-          _MonoLine(text: r'$ flutter analyze'),
-          _MonoLine(text: r'$ cargo run -- status'),
-          _MonoLine(text: r'$ logixa_engine --health'),
-        ],
-      ),
-    );
   }
 }
 
@@ -411,27 +385,6 @@ class _PanelTitle extends StatelessWidget {
           color: AppColors.textPrimary,
         ),
       ],
-    );
-  }
-}
-
-class _MonoLine extends StatelessWidget {
-  final String text;
-
-  const _MonoLine({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 5.h),
-      child: ReusableText(
-        text: text,
-        fontFamily: AppFonts.mono,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textMuted,
-        textDirection: TextDirection.ltr,
-      ),
     );
   }
 }
