@@ -1,605 +1,780 @@
-# todo.md — Logixa EDL AI Post-Step 10 Audit
+# todo.md — Logixa EDL AI Roadmap After Full Review
 
-## الهدف من الملف
-هذا الملف هو نتيجة مراجعة ما بعد Step 10. الهدف منه توثيق:
-
-- ما تم تنفيذه فعليًا.
-- ما هو مكتمل مبدئيًا.
-- ما هو موجود كواجهة فقط أو Placeholder.
-- ما يحتاج ربط بين Flutter و Rust Engine.
-- الخطوات الناقصة المقترحة بعد Step 10.
-
-> ملاحظة مهمة: `README.md` هو المرجع، ولم يتم تعديله في هذه المراجعة. هذا الملف يترجم الفجوات الحالية إلى خطوات تنفيذية.
-
----
-
-## نطاق المراجعة
-تمت مقارنة الملفات المتاحة في النسخة المرفوعة مع:
-
-- `README.md`
-- `did.md`
-- كود Flutter داخل `lib/`
-- كود Rust داخل `logixa_engine/`
-
-### ملاحظة على النسخة المرفوعة
-النسخة التي تمت مراجعتها لا تحتوي على ملفات جذرية مثل:
-
-- `pubspec.yaml`
-- `pubspec.lock`
-- platform folders مثل `linux/`
-
-لذلك تقييم باكدجات Flutter اعتمد على السجل السابق والملفات البرمجية الموجودة، وليس على فحص `pubspec.yaml` داخل هذه النسخة.
+> آخر مراجعة: بعد رفع المشروع إلى GitHub وبعد تنفيذ Step 10.
+>
+> `README.md` هو المرجع الأساسي ولا يتم تعديله إلا بطلب صريح.
+> `did.md` هو سجل التنفيذ.
+> هذا الملف هو خطة التنفيذ العملية بعد مراجعة:
+> - المحادثة والقرارات السابقة.
+> - `README.md`.
+> - `did.md`.
+> - الكود الحالي على GitHub.
+> - حالة الموديلات المحلية الموجودة على الجهاز.
+>
+> الهدف: نمشي بخطوات صغيرة، قابلة للاختبار، بدون تفريع، وبدون تشغيل موديل حقيقي قبل تثبيت الربط والذاكرة والشات.
 
 ---
 
-# 1. ملخص الحالة الحالية
-
-## ✅ شغال فعليًا / مكتمل مبدئيًا
-
-### Flutter UI foundation
-- `CorePage` موجود ويوحد الـ TopBar والخلفية.
-- `TopBar` موجود ومقسم إلى Sections.
-- `AppActivityBar` reusable ومستخدم في Home / Settings / Workspace.
-- ألوان، أحجام، خطوط، Theme، وReusable Widgets موجودة.
-
-### Home / Workspaces
-- إنشاء مشروع جديد موجود.
-- فتح مجلد مشروع موجود.
-- حفظ Active Workspace في `GetStorage` موجود.
-- Recent Workspaces موجودة.
-- منع تكرار المشاريع حسب الاسم أو المسار موجود.
-- إنشاء structure مبدئي للمشروع الجديد موجود.
-
-### Settings / Local Model
-- صفحة `/settings` موجودة.
-- اختيار موديل `.gguf` من الواجهة موجود.
-- إعدادات التشغيل موجودة:
-  - `context_size`
-  - `threads`
-  - `batch_size`
-  - `max_tokens`
-  - `temperature`
-  - `top_p`
-  - `top_k`
-  - `keep_model_loaded`
-  - `unload_after_response`
-  - `auto_start_on_message`
-  - `allow_background_model`
-- التخزين المحلي المؤقت بـ `GetStorage` موجود.
-- `ModelProfileModel` موجود.
-- Multiple Model Profiles موجودة بشكل مبدئي.
-
-### System Prompt
-- System Prompt ديناميكي من Flutter Settings موجود.
-- حفظه واستعادة الافتراضي موجودين.
-- Rust Engine يقبل System Prompt من `/runtime/system-prompt`.
-- `/runtime/chat` يقرأ System Prompt ويعيد معلومات تؤكد تطبيقه.
-
-### Workspace
-- صفحة Workspace موجودة.
-- Explorer موجود.
-- فتح الملفات النصية موجود.
-- Tabs موجودة.
-- منع تكرار فتح نفس الملف في Tabs موجود.
-- إغلاق Tab موجود.
-- Bottom Panel موجود.
-- Logs / Problems / Output موجودة بشكل مبدئي.
-
-### Rust Engine
-- `logixa_engine/` موجود.
-- `/health` موجود.
-- `/status` موجود.
-- `/settings` موجود.
-- Config file موجود ويتولد عند الحاجة.
-- Runtime Manager مبدئي موجود.
-- `/runtime/status` موجود.
-- `/runtime/profile` موجود.
-- `/runtime/chat` موجود كـ lifecycle simulation.
-- `/runtime/unload` موجود.
-- SQLite Memory Skeleton موجود.
-- Memory endpoints موجودة.
-
----
-
-## 🟡 موجود جزئيًا / يحتاج ربط
-
-### Flutter ↔ Rust Engine
-- باكدجات `dio` و`web_socket_channel` تم تجهيزها سابقًا، لكن لا يوجد Flutter Engine Client فعلي في الكود الحالي.
-- Settings في Flutter تحفظ في `GetStorage` فقط.
-- Rust Engine يحفظ في `logixa_engine_config.json` فقط.
-- لا يوجد Sync تلقائي بين Flutter Settings و Rust Config.
-
-### Runtime Model Manager
-- دورة التشغيل موجودة كـ lifecycle فقط.
-- لا يوجد تشغيل GGUF فعلي.
-- لا يوجد `llama.cpp` adapter.
-- لا يوجد فحص حقيقي لوجود ملف الموديل على الجهاز قبل قبول البروفايل.
-
-### Memory System
-- Rust Memory endpoints موجودة.
-- Flutter لا يستخدمها بعد.
-- `/runtime/chat` لا ينشئ Conversation ولا Messages تلقائيًا.
-- لا توجد شاشة Memory/Data Center فعلية.
-- لا يوجد semantic search أو embeddings.
-
-### Workspace Editor
-- المعاينة النصية موجودة.
-- لا يوجد تحرير فعلي للملفات.
-- لا يوجد Save.
-- لا يوجد Unsaved Indicator.
-- `flutter_code_editor` موجود في الخطة لكنه غير مستخدم فعليًا في Workspace Editor الحالي.
-
-### Bottom Panel / Terminal
-- Bottom Panel موجود.
-- Terminal مجرد Placeholder.
-- `xterm` و`flutter_pty` غير مستخدمين فعليًا.
-
-### Extensions
-- زر Extensions وPanel موجودين.
-- لا يوجد Extension manifest.
-- لا يوجد install/uninstall.
-- لا يوجد plugin system فعلي.
-
-### Chat
-- `ChatPage` موجودة كصفحة مولدة/Placeholder.
-- `ChatPageController` ما زال يحتوي TODO.
-- لا يوجد UI Chat حقيقي.
-- لا يوجد ربط بـ `/runtime/chat`.
-
----
-
-## ⚪ Placeholder / غير فعال حاليًا
-
-- TopBar Search button.
-- TopBar Commands button.
-- Home Data Center quick action.
-- Home Sidebar عناصر Chat / Terminal / Data.
-- Workspace Search activity button.
-- Workspace Data activity button.
-- Terminal الحقيقي.
-- Extensions system الحقيقي.
-- Chat screen الحقيقي.
-
----
-
-# 2. مقارنة مباشرة مع README.md و did.md
-
-## Step 1 — تثبيت التصميم الموحد
-**الحالة:** 🟡 مكتمل مبدئيًا لكن يحتاج تثبيت نهائي.
-
-تم تنفيذ CorePage وActivityBar وTopBar وReusable Widgets، لكن بعض الصفحات أو الأزرار ما زالت Placeholder، خصوصًا ChatPage وData/Terminal.
-
-### الناقص
-- توحيد صفحات Placeholder لاحقًا بدل النص الافتراضي.
-- تثبيت Pattern واضح لكل صفحة جديدة:
-  - `View`
-  - `Controller`
-  - `Sections`
-  - `Reusable widgets`
-
----
-
-## Step 2 — Settings Page
-**الحالة:** ✅ مكتمل مبدئيًا.
-
-صفحة Settings موجودة وتعمل، لكنها حاليًا مركزة على Local Model فقط.
-
-### الناقص لاحقًا
-- General section.
-- Appearance section.
-- Workspace section.
-- Memory section.
-
----
-
-## Step 3 — Local Model Settings
-**الحالة:** ✅ مكتمل مبدئيًا في Flutter.
-
-الإعدادات المطلوبة موجودة، و`top_k` تم إضافته.
-
-### الناقص
-- مزامنة الإعدادات مع Rust Engine.
-- التحقق من مسار ملف الموديل من Rust.
-- إرسال الإعدادات عند runtime تلقائيًا.
-
----
-
-## Step 4 — Model Profile System
-**الحالة:** ✅ مكتمل مبدئيًا في Flutter.
-
-Multiple Profiles موجودة، والإضافة/التعديل/الحذف/التعيين كنشط موجودة.
-
-### الناقص
-- مزامنة البروفايل النشط مع `/runtime/profile` تلقائيًا.
-- حفظ البروفايلات في Rust Memory لاحقًا بدل Flutter فقط.
-- منع حذف/تعديل بروفايل مستخدم حاليًا في Session نشطة، لاحقًا.
-
----
-
-## Step 5 — Workspace Tree Polish
-**الحالة:** 🟡 مكتمل مبدئيًا.
-
-الشجرة تعمل، والطي/التوسيع/التحديث موجودين، والقراءة تتم بطريقة آمنة نسبيًا.
-
-### الناقص
-- Context menu باستخدام `super_context_menu`.
-- Create / Rename / Delete للملفات والمجلدات.
-- File search داخل المشروع.
-- استخدام `watcher` لتحديث الشجرة عند تغيير الملفات.
-- تمييز الملفات المفتوحة/المعدلة لاحقًا بشكل أقوى.
-
----
-
-## Step 6 — Editor Tabs
-**الحالة:** 🟡 مكتمل مبدئيًا.
-
-Tabs موجودة وتعمل للفتح والإغلاق والتنقل.
-
-### الناقص
-- استخدام `flutter_code_editor` كمحرر حقيقي.
-- Edit / Save.
-- Unsaved indicator.
-- حفظ حالة Tabs في Workspace Session.
-
----
-
-## Step 7 — Bottom Panel
-**الحالة:** 🟡 UI مكتمل مبدئيًا.
-
-Tabs السفلي موجود: Terminal / Logs / Problems / Output.
-
-### الناقص
-- Terminal حقيقي باستخدام `xterm` و`flutter_pty`.
-- Logs من Rust Engine.
-- Problems حقيقية من analyzer/build output.
-- Output panel مربوط بعمليات فعلية.
-
----
-
-## Step 8 — Rust Engine Skeleton
-**الحالة:** ✅ مكتمل مبدئيًا.
-
-Endpoints الأساسية موجودة، والـ Engine اشتغل محليًا حسب لوجات المستخدم السابقة.
-
-### الناقص
-- Flutter Engine Client.
-- تشغيل/إيقاف الـ Engine من Flutter لاحقًا إن لزم.
-- Handling أفضل لو البورت مستخدم.
-
----
-
-## Step 9 — Runtime Model Manager
-**الحالة:** 🟡 Runtime Lifecycle فقط.
-
-Runtime endpoints موجودة، لكن تشغيل GGUF الحقيقي غير موجود عمدًا.
-
-### الناقص
-- `llama.cpp` process adapter.
-- بناء launch args من Model Profile.
-- Start/Stop process فعليًا.
-- Health check للـ model server/adapter.
-- Streaming response.
-- ربط `/runtime/chat` بالذاكرة تلقائيًا.
-
----
-
-## Step 9.1 — Dynamic System Prompt
-**الحالة:** 🟡 مكتمل محليًا لكن غير مربوط من Flutter إلى Rust تلقائيًا.
-
-Flutter يحفظ System Prompt محليًا، وRust يقبل System Prompt، لكن لا يوجد client يزامنهم.
-
-### الناقص
-- عند حفظ System Prompt من Flutter، يتم POST إلى `/runtime/system-prompt`.
-- عند فتح Settings، يتم قراءة Rust settings أو توضيح مصدر الحقيقة.
-- Markdown import/export مؤجل.
-
----
-
-## Step 10 — Memory System
-**الحالة:** 🟡 Skeleton موجود في Rust.
-
-SQLite والجداول والـ endpoints موجودة.
-
-### الناقص
-- Flutter Memory Client.
-- Data Center UI.
-- حفظ محادثات runtime تلقائيًا.
-- ربط Workspace sessions بالواجهة.
-- حذف/تعديل/بحث للذاكرة.
-- Migration/versioning واضح للجداول.
-
----
-
-# 3. أهم الفجوات المعمارية الحالية
-
-## 3.1 مصدر الحقيقة للإعدادات غير موحد
-حاليًا عندنا مصدرين:
-
-- Flutter `GetStorage`
-- Rust `logixa_engine_config.json`
-
-لازم نقرر قريبًا:
+# 0. الحالة الحالية المختصرة
+
+## 0.1 المشروع
+
+- اسم المشروع: `logixa_edl_ai`
+- GitHub:
+  - `https://github.com/Mostafa-Falcon/logixa_edl_ai`
+- آخر نقطة ثابتة:
+  - `step10-memory-system-audit`
+- المنهج:
+  - Flutter = واجهة EDL / IDE / Control Center.
+  - Rust Engine = القلب المحلي الحقيقي.
+  - الموديل المحلي لا يعمل مع فتح التطبيق.
+  - الموديل يعمل فقط عند إرسال رسالة لو وضع الموديل المحلي مفعّل.
+  - بعد الرد يتم تفريغ/إيقاف الموديل حسب سياسة التشغيل.
+
+## 0.2 الموديلات المحلية الموجودة حاليًا
+
+الموديلات موجودة محليًا داخل:
 
 ```text
-Flutter = UI cache فقط
-Rust Engine = Source of Truth للإعدادات المهمة
+models/gemma3_abliterated_v2/
 ```
 
-أو نبقي Flutter هو المصدر مؤقتًا لكن نزامنه مع Rust عند كل Save.
+وبداخلها:
 
-**القرار المقترح:** Rust يكون Source of Truth بعد Step 10، وFlutter يحتفظ بنسخة UI فقط.
+```text
+gemma-3-4b-it-abliterated-v2.q4_k_m.gguf
+gemma-3-12b-it-abliterated-v2.q4_k_m.gguf
+```
+
+> تنبيه: مجلد `models/` وملفات `.gguf` لا تترفع إلى GitHub.
 
 ---
 
-## 3.2 لا يوجد Engine Client في Flutter
-رغم وجود `dio`، لا يوجد service مثل:
+# 1. القرارات الجديدة بعد مراجعة الموديلات
+
+## 1.1 استخدام 4B و12B
+
+### Gemma 3 4B Q4_K_M
+
+يكون البروفايل اليومي السريع:
+
+```text
+role = fast
+use = chat / testing / normal tasks / light code help
+```
+
+### Gemma 3 12B Q4_K_M
+
+يكون بروفايل جودة أعلى عند الحاجة فقط:
+
+```text
+role = quality
+use = code review / architecture / hard reasoning / important decisions
+```
+
+## 1.2 ممنوع تحميل 12B دائمًا
+
+سياسة 12B:
+
+```text
+keep_model_loaded = false
+unload_after_response = true
+load_policy = on_demand
+ram_policy = conservative
+```
+
+السبب: الجهاز الحالي RAM حوالي 15GB، وتشغيل 12B لفترات طويلة ممكن يضغط الجهاز.
+
+## 1.3 Smart Switching لاحقًا
+
+لاحقًا بعد تثبيت الشات والذاكرة وتشغيل GGUF الحقيقي، نضيف:
+
+```text
+Runtime Model Router
+```
+
+وظيفته يختار بين:
+
+```text
+4B Fast
+12B Quality
+```
+
+لكن هذا ليس للتنفيذ قبل Engine Client + Chat + Memory Save.
+
+---
+
+# 2. إعدادات Gemma 3 المطلوبة
+
+## 2.1 Prompt Template
+
+لازم يكون عندنا Prompt Template قابل للتعديل من الإعدادات أو من Runtime Profile.
+
+القالب الأساسي لـ Gemma 3:
+
+```text
+<start_of_turn>user
+{user_prompt}<end_of_turn>
+<start_of_turn>model
+```
+
+ولو عندنا System Prompt، في المرحلة الحالية الأفضل إدخاله داخل بداية رسالة المستخدم بالشكل:
+
+```text
+<start_of_turn>user
+{system_prompt}
+
+{user_prompt}<end_of_turn>
+<start_of_turn>model
+```
+
+> لاحقًا عند استخدام llama.cpp chat endpoint أو tokenizer chat template، نراجع هل القالب يتطبق من runtime ولا من السيرفر.
+
+## 2.2 Sampling Settings
+
+الإعدادات الأساسية التي يجب دعمها في ModelProfile:
+
+```text
+temperature = 1.0
+top_k = 64
+top_p = 0.95
+repeat_penalty = 1.10 أو 1.20
+presence_penalty = 0.10
+```
+
+حاليًا الموجود في الكود:
+
+```text
+temperature
+top_k
+top_p
+```
+
+الناقص ويجب إضافته قبل تشغيل GGUF الحقيقي:
+
+```text
+repeat_penalty
+presence_penalty
+prompt_template
+model_role
+load_policy
+ram_policy
+```
+
+---
+
+# 3. الوضع الحالي حسب README / did / الكود
+
+## ✅ مكتمل مبدئيًا
+
+- Home Page.
+- Workspace Page.
+- TopBar.
+- ActivityBar.
+- File Explorer.
+- Editor Preview.
+- Editor Tabs.
+- Bottom Panel UI.
+- Settings Page.
+- Local Model Settings.
+- Multiple Model Profiles.
+- Dynamic System Prompt داخل Flutter.
+- Rust Engine Skeleton.
+- Runtime Manager lifecycle simulation.
+- Memory System Skeleton داخل Rust.
+- `todo.md` و `did.md`.
+
+## 🟡 موجود جزئيًا
+
+- Flutter Settings تحفظ في `GetStorage`.
+- Rust Engine يحفظ في `logixa_engine_config.json`.
+- لا يوجد Flutter Engine Client فعلي يربط الاتنين.
+- `/runtime/chat` موجود لكنه lifecycle mock فقط.
+- Memory endpoints موجودة، لكن Flutter لا يستخدمها بعد.
+- ChatPage موجودة لكنها ليست Chat حقيقي.
+- Terminal placeholder فقط.
+- Extensions placeholder فقط.
+- Editor preview وليس editor كامل.
+
+## ⚪ Placeholder
+
+- Search.
+- Commands.
+- Data Center.
+- Real Terminal.
+- Real Extensions.
+- Real Chat.
+- Real GGUF execution.
+- Real Code Editor save/edit.
+
+---
+
+# 4. القاعدة التنفيذية من الآن
+
+كل خطوة قادمة لازم تعمل الآتي:
+
+```text
+1. مراجعة README.md
+2. مراجعة did.md
+3. مراجعة todo.md
+4. تنفيذ خطوة واحدة فقط
+5. عدم لمس README.md إلا بطلب صريح
+6. تحديث did.md بعد التنفيذ
+7. لو تغيرت الخطة أو ظهر تعارض: نقف ونتناقش
+8. بعد نجاح الفحص: commit + tag
+```
+
+---
+
+# 5. الخطوات الصحيحة القادمة
+
+## Step 11 — Flutter Engine Client + Engine Status Sync
+
+**الأولوية:** P0  
+**الهدف:** ربط Flutter بالـ Rust Engine بدون تشغيل موديل.
+
+### المطلوب
+
+إضافة Service:
 
 ```text
 lib/app/data/services/engine_client_service.dart
 ```
 
-وهذا هو الرابط الناقص بين الواجهة والـ Engine.
+يستخدم `dio` لقراءة:
 
----
+```text
+GET /health
+GET /status
+GET /settings
+GET /runtime/status
+GET /memory/status
+```
 
-## 3.3 Chat غير موجود فعليًا
-رغم أن Runtime endpoint موجود، لا توجد شاشة Chat تستخدمه.
+### UI المطلوب
 
----
+إظهار حالة الـ Engine في الواجهة:
 
-## 3.4 Memory موجودة في Rust لكن غير مرئية في Flutter
-Data Center ما زال Placeholder.
+```text
+Engine Online / Offline
+Runtime Stage
+Model Loaded
+Active Model Profile
+Memory DB status
+```
 
----
+يفضل مبدئيًا في:
 
-## 3.5 Workspace Editor ليس محررًا فعليًا بعد
-حاليًا هو Preview ممتاز كبداية، لكن لا يوجد Edit/Save.
+```text
+TopBar
+Settings
+Bottom Panel / Output
+```
 
----
+### ممنوع في هذه الخطوة
 
-# 4. الخطوات المقترحة بعد المراجعة
-
-## Step 11 — Flutter Engine Client + Engine Status Sync
-**الأولوية:** P0
-
-### الهدف
-ربط Flutter بالـ Rust Engine بدون تشغيل موديل فعلي.
-
-### المطلوب
-- إضافة Service:
-  - `lib/app/data/services/engine_client_service.dart`
-- يستخدم `dio` لقراءة:
-  - `GET /health`
-  - `GET /status`
-  - `GET /settings`
-  - `GET /runtime/status`
-- إضافة حالة Engine داخل TopBar أو Settings:
-  - Engine Online
-  - Engine Offline
-  - Local Model Enabled
-  - Runtime Stage
-- عدم تشغيل GGUF.
+```text
+- تشغيل GGUF
+- إرسال Chat
+- مزامنة settings
+- تعديل Memory
+```
 
 ### الناتج المتوقع
-Flutter يعرف هل Rust Engine شغال ولا لأ.
+
+Flutter يعرف هل Rust Engine شغال أم لا.
 
 ---
 
-## Step 12 — Sync Local Model Settings to Rust
-**الأولوية:** P0
+## Step 12 — Settings Sync To Rust
 
-### الهدف
-عند حفظ إعدادات الموديل في Flutter، يتم إرسالها إلى Rust Engine.
+**الأولوية:** P0  
+**الهدف:** توحيد مصدر الحقيقة تدريجيًا.
 
 ### المطلوب
-- عند `saveLocalModelSettings()` يتم POST إلى:
-  - `/runtime/profile`
-- عند `saveSystemPrompt()` يتم POST إلى:
-  - `/runtime/system-prompt`
-- معالجة حالة فشل الاتصال بدون كراش.
-- عرض رسالة واضحة:
-  - تم الحفظ محليًا فقط.
-  - تم الحفظ محليًا وفي Rust.
 
-### الناتج المتوقع
-Flutter Settings وRust Config لا يفضلوا منفصلين.
+عند حفظ إعدادات الموديل في Flutter:
+
+```text
+POST /runtime/profile
+```
+
+عند حفظ System Prompt:
+
+```text
+POST /runtime/system-prompt
+```
+
+عند فتح Settings:
+
+```text
+GET /settings
+```
+
+### القرار
+
+بعد هذه الخطوة:
+
+```text
+Rust Engine = Source of Truth للإعدادات المهمة
+Flutter GetStorage = UI Cache فقط
+```
+
+### يجب إضافة الحقول الناقصة إلى ModelProfile في Flutter وRust
+
+```text
+repeat_penalty
+presence_penalty
+prompt_template
+model_role
+load_policy
+ram_policy
+```
+
+### ممنوع في هذه الخطوة
+
+```text
+- تشغيل GGUF
+- Chat UI
+- Memory auto-save
+```
 
 ---
 
-## Step 13 — Real Chat Page Skeleton
-**الأولوية:** P0
+## Step 13 — Local Model Profiles Presets
 
-### الهدف
-استبدال ChatPage placeholder بشاشة شات حقيقية مبدئية.
+**الأولوية:** P0  
+**الهدف:** تجهيز بروفايلات 4B و12B من غير تشغيل حقيقي.
 
 ### المطلوب
-- إزالة TODO من `ChatPageController`.
-- UI بسيط:
-  - قائمة رسائل.
-  - Text input.
-  - Send button.
-- عند الإرسال:
-  - يرسل prompt إلى `/runtime/chat`.
-  - يعرض response lifecycle message مؤقتًا.
-- لا يوجد GGUF فعلي بعد.
 
-### الناتج المتوقع
-الشات يبدأ يستخدم Runtime endpoint فعليًا.
+إضافة زر أو Action في Settings:
+
+```text
+Create Recommended Gemma Profiles
+```
+
+ينشئ بروفايلين:
+
+### 13.1 Gemma 4B Fast
+
+```json
+{
+  "id": "gemma_4b_fast",
+  "name": "Gemma 3 4B Fast",
+  "role": "fast",
+  "model_path": "models/gemma3_abliterated_v2/gemma-3-4b-it-abliterated-v2.q4_k_m.gguf",
+  "context_size": 4096,
+  "threads": 6,
+  "batch_size": 256,
+  "max_tokens": 512,
+  "temperature": 1.0,
+  "top_p": 0.95,
+  "top_k": 64,
+  "repeat_penalty": 1.1,
+  "presence_penalty": 0.1,
+  "keep_model_loaded": false,
+  "unload_after_response": true,
+  "load_policy": "on_demand",
+  "ram_policy": "balanced"
+}
+```
+
+### 13.2 Gemma 12B Quality
+
+```json
+{
+  "id": "gemma_12b_quality",
+  "name": "Gemma 3 12B Quality",
+  "role": "quality",
+  "model_path": "models/gemma3_abliterated_v2/gemma-3-12b-it-abliterated-v2.q4_k_m.gguf",
+  "context_size": 4096,
+  "threads": 6,
+  "batch_size": 128,
+  "max_tokens": 768,
+  "temperature": 0.8,
+  "top_p": 0.95,
+  "top_k": 64,
+  "repeat_penalty": 1.1,
+  "presence_penalty": 0.1,
+  "keep_model_loaded": false,
+  "unload_after_response": true,
+  "load_policy": "on_demand",
+  "ram_policy": "conservative"
+}
+```
+
+### مهم
+
+- لو المسار غير موجود، يظهر Warning ولا يكراش.
+- لا يتم رفع الموديلات إلى Git.
+- لا يتم تشغيل أي موديل في هذه الخطوة.
 
 ---
 
-## Step 14 — Auto-save Chat to Rust Memory
-**الأولوية:** P0
+## Step 14 — Real Chat Page Skeleton
 
-### الهدف
-أي رسالة شات تتحفظ في Memory SQLite.
+**الأولوية:** P0  
+**الهدف:** تحويل ChatPage من Placeholder إلى شاشة شات مبدئية.
 
 ### المطلوب
-- إنشاء conversation تلقائيًا عند أول رسالة.
-- حفظ user message في:
-  - `POST /memory/messages`
-- حفظ assistant/runtime response في:
-  - `POST /memory/messages`
-- ربط conversation بـ:
-  - workspace path إن وجد.
-  - active model profile.
-  - system prompt preview.
 
-### الناتج المتوقع
-Memory System تبدأ تبقى مستخدمة فعليًا، مش endpoints فقط.
+- Messages list.
+- Text input.
+- Send button.
+- اختيار Profile يدوي أو استخدام active profile.
+- إرسال الطلب إلى:
+
+```text
+POST /runtime/chat
+```
+
+### مؤقتًا
+
+يعرض lifecycle response:
+
+```text
+runtime lifecycle is ready; actual GGUF execution adapter is not connected
+```
+
+### ممنوع
+
+```text
+- تشغيل GGUF الحقيقي
+- Streaming
+- Tools
+```
 
 ---
 
-## Step 15 — Data Center / Memory UI
-**الأولوية:** P1
+## Step 15 — Auto-save Chat To Rust Memory
 
-### الهدف
-تشغيل زر Data Center بدل Coming Soon.
+**الأولوية:** P0  
+**الهدف:** أي رسالة شات تتحفظ في SQLite Memory.
 
 ### المطلوب
-- شاشة Memory/Data Center.
+
+عند أول رسالة:
+
+```text
+POST /memory/conversations
+```
+
+ثم حفظ رسالة المستخدم:
+
+```text
+POST /memory/messages
+```
+
+ثم حفظ رد runtime/assistant:
+
+```text
+POST /memory/messages
+```
+
+مع metadata:
+
+```text
+workspace_path
+active_model_profile_id
+system_prompt_preview
+runtime_stage
+```
+
+### الناتج
+
+Memory System يبدأ يكون مستخدم فعليًا، مش مجرد endpoints.
+
+---
+
+## Step 16 — Data Center / Memory UI
+
+**الأولوية:** P1  
+**الهدف:** تشغيل زر Data Center بدل Placeholder.
+
+### المطلوب
+
+- صفحة Memory / Data Center.
 - تعرض:
-  - conversations count.
+  - conversations.
   - messages count.
   - memory items.
   - experts.
   - workspace sessions.
-- قراءة البيانات من Rust endpoints.
+  - selected model profile snapshot.
+- تستخدم Rust Memory endpoints.
 
 ---
 
-## Step 16 — Workspace Sessions Sync
-**الأولوية:** P1
+## Step 17 — Workspace Sessions Sync
 
-### الهدف
-كل مرة يفتح Workspace أو File، تتسجل جلسة في Rust Memory.
+**الأولوية:** P1  
+**الهدف:** تسجيل استخدام الـ Workspace في Rust Memory.
 
 ### المطلوب
-- عند فتح Workspace:
-  - `POST /memory/workspace-sessions`
-- عند فتح File:
-  - تحديث/إضافة session metadata.
-- حفظ آخر Active Workspace لاحقًا من Rust أو sync واضح.
+
+عند فتح Workspace:
+
+```text
+POST /memory/workspace-sessions
+```
+
+عند فتح ملف:
+
+```text
+update / add session metadata
+```
+
+### الناتج
+
+Rust Memory تعرف آخر Workspace وملفات مفتوحة.
 
 ---
 
-## Step 17 — Workspace Context Menu
-**الأولوية:** P1
+## Step 18 — Workspace Context Menu
 
-### الهدف
-استخدام `super_context_menu` في شجرة الملفات.
+**الأولوية:** P1  
+**الهدف:** استخدام `super_context_menu` في الشجرة.
 
-### المطلوب
-- Right click على file/folder.
-- Actions مبدئية:
-  - Open
-  - Reveal path
-  - Copy path
-  - Refresh
-- تأجيل Create/Rename/Delete لو عايزين أمان أعلى.
+### المطلوب مبدئيًا
+
+- Right click على File/Folder.
+- Actions:
+  - Open.
+  - Copy path.
+  - Reveal path.
+  - Refresh.
+- تأجيل Create/Rename/Delete لحين تثبيت الأمان.
 
 ---
 
-## Step 18 — Real Terminal
-**الأولوية:** P1
+## Step 19 — Real Terminal
 
-### الهدف
-تحويل Terminal placeholder إلى طرفية حقيقية.
+**الأولوية:** P1  
+**الهدف:** تحويل Terminal placeholder إلى طرفية حقيقية.
 
 ### المطلوب
-- استخدام `xterm` + `flutter_pty`.
+
+- استخدام:
+  - `xterm`
+  - `flutter_pty`
 - التشغيل داخل active workspace path.
-- زر Stop/Restart terminal.
-- حماية من تشغيل أوامر تلقائية بدون طلب واضح.
+- Stop / Restart terminal.
+- لا يتم تشغيل أوامر تلقائيًا بدون طلب واضح.
 
 ---
 
-## Step 19 — Real Code Editor
-**الأولوية:** P1
+## Step 20 — Real Code Editor
 
-### الهدف
-تحويل Preview إلى Editor حقيقي.
+**الأولوية:** P1  
+**الهدف:** تحويل Preview إلى محرر فعلي.
 
 ### المطلوب
+
 - استخدام `flutter_code_editor`.
-- Edit / Save.
+- Edit.
+- Save.
 - Unsaved indicator.
-- حماية الملفات الكبيرة/binary.
-- حفظ logs عند الحفظ.
+- حماية الملفات الكبيرة والـ binary.
+- Log عند الحفظ.
 
 ---
 
-## Step 20 — Runtime GGUF Adapter Planning
-**الأولوية:** P2
+## Step 21 — Runtime GGUF Adapter Planning
 
-### الهدف
-تخطيط تشغيل GGUF الحقيقي قبل التنفيذ.
+**الأولوية:** P2  
+**الهدف:** تخطيط تشغيل GGUF الحقيقي قبل الكود.
 
-### المطلوب قبل الكود
-- تحديد هل adapter سيكون:
-  - `llama.cpp` process manager.
-  - أو Rust binding لاحقًا.
-- تحديد path لـ llama binary.
-- تحديد process lifecycle.
-- تحديد streaming أو non-streaming.
-- تحديد logs/errors.
+### قرارات مطلوبة قبل التنفيذ
 
-### ملاحظة
-لا ننفذ تشغيل موديل حقيقي قبل تثبيت:
-- Engine Client.
-- Chat UI.
-- Memory Save.
-- Review security/process policy.
+- هل هنستخدم:
+  - `llama.cpp` process manager
+  - أم Rust binding لاحقًا؟
+- أين مسار `llama-server`؟
+- هل runtime سيكون:
+  - one-shot process per request
+  - أم persistent server مع unload policy؟
+- هل هنستخدم:
+  - raw prompt template
+  - أم chat completions template؟
+- هل هنبدأ non-streaming ثم نضيف streaming؟
+
+### القرار المبدئي المقترح
+
+```text
+llama.cpp process manager داخل Rust
+non-streaming أولًا
+on-demand load
+unload_after_response افتراضيًا
+```
 
 ---
 
-# 5. Cleanup مطلوب قبل التوسع الكبير
+## Step 22 — llama.cpp Adapter Prototype
+
+**الأولوية:** P2  
+**الهدف:** تشغيل موديل GGUF فعلي لأول مرة بشكل آمن.
+
+### المطلوب
+
+- تجربة 4B فقط أولًا.
+- استخدام active model profile.
+- بناء prompt template الصحيح لـ Gemma.
+- تطبيق:
+  - temperature.
+  - top_k.
+  - top_p.
+  - repeat_penalty.
+  - presence_penalty.
+- حفظ الرد في Memory.
+- لا تشغيل 12B في أول تجربة.
+
+### شروط النجاح
+
+```text
+- لا Freeze
+- لا بقاء موديل محمل بعد الرد إلا لو مفعّل
+- الرد يرجع إلى Chat UI
+- memory تحفظ الرسائل
+```
+
+---
+
+## Step 23 — Streaming Response
+
+**الأولوية:** P2  
+**الهدف:** الرد يظهر تدريجيًا في Chat.
+
+### المطلوب
+
+- Rust stream endpoint أو WebSocket/SSE.
+- Flutter يستقبل tokens.
+- Stop generation button.
+- حفظ الرسالة النهائية فقط في Memory.
+
+---
+
+## Step 24 — Runtime Model Router
+
+**الأولوية:** P2  
+**الهدف:** الاختيار الذكي بين 4B و12B.
+
+### المطلوب
+
+- Manual mode:
+  - Fast.
+  - Quality.
+- Auto mode لاحقًا:
+  - لو prompt بسيط → 4B.
+  - لو prompt صعب أو كود كبير → 12B.
+- ممنوع تحميل 4B و12B معًا في هذه المرحلة.
+
+---
+
+## Step 25 — Extensions System Planning
+
+**الأولوية:** P2  
+**الهدف:** تحويل زر Extensions إلى نظام قابل للتوسع.
+
+### المطلوب قبل التنفيذ
+
+- تعريف extension manifest.
+- أماكن التخزين.
+- الصلاحيات.
+- هل extension Flutter-only أم Rust tools أيضًا؟
+- منع تشغيل كود خارجي بدون موافقة.
+
+---
+
+# 6. Cleanup قبل تشغيل موديل حقيقي
 
 ## C1 — README Consistency Review
-**الأولوية:** P1 — يحتاج إذن صريح لتعديل README.
 
-يوجد في `README.md` جزء ترتيب لاحق لا يعكس كل الخطوات التي تمت بعد Step 10 بدقة. لا يتم تعديله إلا بطلب صريح.
+**الأولوية:** P1  
+**يحتاج إذن صريح لتعديل README**
 
-## C2 — Zip / Project package completeness
-**الأولوية:** P1
+README يحتوي على خطة قديمة جزئيًا وبعض الترتيب لا يعكس ما تم بعد Step 10.  
+لا يتم تعديل README إلا لو مصطفى طلب ذلك صراحة.
 
-النسخة المرفوعة للمراجعة لا تحتوي على `pubspec.yaml`. في المراجعات القادمة، الأفضل رفع مشروع كامل أو تأكيد أن zip يحتوي فقط على الملفات المعدلة.
+## C2 — Flutter Linux Close Warning
 
-## C3 — Remove dead placeholders when their pages become real
 **الأولوية:** P2
 
-- `localModelComingSoon`
-- `dataCenterComingSoon`
-- `ChatPageView is working`
-- top bar search/commands empty callbacks
-
-## C4 — Add endpoint test scripts
-**الأولوية:** P2
-
-إضافة سكريبتات بسيطة لاحقًا:
+ظهر تحذير عند الإغلاق:
 
 ```text
-scripts/test_engine_health.sh
-scripts/test_runtime_profile.sh
-scripts/test_memory_endpoints.sh
+FlutterEngineRemoveView returned kInvalidArguments
+```
+
+ليس blocker طالما يظهر بعد الضغط على إغلاق فقط، لكن يتم تنظيفه لاحقًا.
+
+## C3 — GitHub Hygiene
+
+**الأولوية:** P0 مستمر
+
+- لا ترفع:
+  - `models/`
+  - `*.gguf`
+  - `logixa_engine_config.json`
+  - `logixa_engine_memory.sqlite`
+  - `target/`
+  - `build/`
+
+## C4 — Tests / Smoke Checks
+
+بعد كل خطوة:
+
+```bash
+flutter pub get
+flutter analyze
+flutter run -d linux
+```
+
+ولـ Rust:
+
+```bash
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+واختبار endpoints حسب الخطوة.
+
+---
+
+# 7. الترتيب المختصر للتنفيذ
+
+```text
+Step 11  Flutter Engine Client + Engine Status Sync
+Step 12  Sync Settings/System Prompt/Profile to Rust + add missing model fields
+Step 13  Recommended Gemma 4B/12B Profiles
+Step 14  Real Chat Page Skeleton
+Step 15  Auto-save Chat to Rust Memory
+Step 16  Data Center / Memory UI
+Step 17  Workspace Sessions Sync
+Step 18  Workspace Context Menu
+Step 19  Real Terminal
+Step 20  Real Code Editor
+Step 21  Runtime GGUF Adapter Planning
+Step 22  llama.cpp Adapter Prototype with 4B only
+Step 23  Streaming Response
+Step 24  Runtime Model Router 4B/12B
+Step 25  Extensions System Planning
 ```
 
 ---
 
-# 6. القرار المقترح للخطوة القادمة
+# 8. قاعدة منع اللخبطة
 
-الخطوة المنطقية بعد هذه المراجعة:
-
-```text
-Step 11 — Flutter Engine Client + Engine Status Sync
-```
-
-ثم:
+لا يتم تنفيذ Step 22 أو تشغيل أي موديل GGUF حقيقي قبل اكتمال:
 
 ```text
-Step 12 — Sync Settings/System Prompt to Rust
-Step 13 — Real Chat Page Skeleton
-Step 14 — Auto-save Chat to Rust Memory
+Step 11
+Step 12
+Step 14
+Step 15
 ```
 
-بهذا الترتيب نبدأ نربط الأجزاء الموجودة بدل إضافة واجهات جديدة غير مربوطة.
+لأن تشغيل الموديل قبل وجود Engine Client + Chat + Memory Save هيخلينا نكرر نفس لخبطة المشاريع القديمة.
+
