@@ -8,8 +8,10 @@ import '../../../../constants/app_fonts.dart';
 import '../../../../constants/app_sizes.dart';
 import '../../../../constants/app_strings.dart';
 import '../../../../data/models/opened_file_model.dart';
+import '../../../../widgets/reusable_widgets/reusable_button.dart';
 import '../../../../widgets/reusable_widgets/reusable_editor_tab.dart';
 import '../../../../widgets/reusable_widgets/reusable_text.dart';
+import 'workspace_code_editor.dart';
 import '../../controllers/work_space_controller.dart';
 
 class WorkspaceEditorArea extends GetView<WorkSpaceController> {
@@ -50,7 +52,7 @@ class WorkspaceEditorArea extends GetView<WorkSpaceController> {
               );
             }
 
-            return const _WorkspaceFilePreview();
+            return const WorkspaceCodeEditor();
           }),
         ),
       ],
@@ -92,6 +94,7 @@ class _WorkspaceEditorTabsBarState extends State<_WorkspaceEditorTabsBar> {
       child: Obx(() {
         final tabs = controller.openedFiles.toList(growable: false);
         final activePath = controller.openedFilePath.value;
+        controller.dirtyFilePaths.length;
 
         if (tabs.isEmpty) {
           return Padding(
@@ -120,8 +123,10 @@ class _WorkspaceEditorTabsBarState extends State<_WorkspaceEditorTabsBar> {
             itemBuilder: (context, index) {
               final tab = tabs[index];
 
+              final isDirty = controller.isFileDirty(tab.path);
+
               return ReusableEditorTab(
-                title: tab.name,
+                title: isDirty ? '${tab.name} •' : tab.name,
                 icon: _resolveFileIcon(tab),
                 isActive: tab.path == activePath,
                 onTap: () => controller.setActiveOpenedFile(tab.path),
@@ -174,6 +179,10 @@ class _WorkspaceEditorHeader extends GetView<WorkSpaceController> {
       child: Obx(() {
         final fileName = controller.openedFileName.value;
         final filePath = controller.openedFileSubtitle;
+        final statusLabel = controller.activeEditorStatusLabel;
+        final canSave = controller.canSaveActiveFile;
+        final isSaving = controller.isSavingOpenedFile.value;
+        final isEditable = controller.isActiveFileEditable;
 
         return Row(
           children: [
@@ -190,7 +199,20 @@ class _WorkspaceEditorHeader extends GetView<WorkSpaceController> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  ReusableText(
+                    text: fileName.isEmpty
+                        ? AppStrings.workspaceEditorTitle
+                        : fileName,
+                    fontFamily: AppFonts.english,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textDirection: TextDirection.ltr,
+                  ),
                   if (filePath.isNotEmpty) ...[
+                    SizedBox(height: 2.h),
                     ReusableText(
                       text: filePath,
                       fontFamily: AppFonts.mono,
@@ -205,6 +227,23 @@ class _WorkspaceEditorHeader extends GetView<WorkSpaceController> {
                 ],
               ),
             ),
+            if (fileName.isNotEmpty) ...[
+              SizedBox(width: AppSizes.md.w),
+              _EditorStatusPill(
+                label: statusLabel,
+                isDirty: controller.isActiveFileDirty,
+                isEditable: isEditable,
+              ),
+              SizedBox(width: AppSizes.sm.w),
+              ReusableButton(
+                title: AppStrings.workspaceSaveFileButton,
+                icon: Icons.save_rounded,
+                height: 32,
+                variant: ReusableButtonVariant.secondary,
+                isLoading: isSaving,
+                onPressed: canSave ? controller.saveActiveFile : null,
+              ),
+            ],
           ],
         );
       }),
@@ -212,71 +251,53 @@ class _WorkspaceEditorHeader extends GetView<WorkSpaceController> {
   }
 }
 
-class _WorkspaceFilePreview extends StatefulWidget {
-  const _WorkspaceFilePreview();
+class _EditorStatusPill extends StatelessWidget {
+  final String label;
+  final bool isDirty;
+  final bool isEditable;
 
-  @override
-  State<_WorkspaceFilePreview> createState() => _WorkspaceFilePreviewState();
-}
-
-class _WorkspaceFilePreviewState extends State<_WorkspaceFilePreview> {
-  final ScrollController _verticalController = ScrollController();
-  final ScrollController _horizontalController = ScrollController();
-  final WorkSpaceController controller = Get.find<WorkSpaceController>();
-
-  @override
-  void dispose() {
-    _verticalController.dispose();
-    _horizontalController.dispose();
-    super.dispose();
-  }
+  const _EditorStatusPill({
+    required this.label,
+    required this.isDirty,
+    required this.isEditable,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final content = controller.openedFileContent.value;
+    final color = !isEditable
+        ? AppColors.textMuted
+        : isDirty
+        ? AppColors.warning
+        : AppColors.success;
 
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: AppColors.editorBackground,
-        child: Scrollbar(
-          controller: _verticalController,
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            controller: _verticalController,
-            primary: false,
-            padding: EdgeInsets.all(AppSizes.xl.w),
-            child: Scrollbar(
-              controller: _horizontalController,
-              thumbVisibility: true,
-              notificationPredicate: (notification) => notification.depth == 1,
-              child: SingleChildScrollView(
-                controller: _horizontalController,
-                scrollDirection: Axis.horizontal,
-                primary: false,
-                child: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: 900.w),
-                    child: ReusableText(
-                      text: content,
-                      fontFamily: AppFonts.mono,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      height: 1.6,
-                      color: AppColors.textSecondary,
-                      selectable: true,
-                      softWrap: false,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+    return Container(
+      height: 28.h,
+      padding: EdgeInsets.symmetric(horizontal: AppSizes.sm.w),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd.r),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6.w,
+            height: 6.w,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-        ),
-      );
-    });
+          SizedBox(width: AppSizes.xs.w),
+          ReusableText(
+            text: label,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: color,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -128,11 +128,17 @@ class AppStrings {
       'Rust Engine Client غير جاهز لمزامنة مساحة العمل.';
   static const String workspaceLogsCleared = 'تم مسح لوجات مساحة العمل.';
   static const String workspaceLargeFilePreviewBlocked =
-      'الملف كبير للمعاينة السريعة. افتحه لاحقًا في محرر كامل.';
+      'الملف كبير جدًا للتحرير الآمن حاليًا. الحفظ متوقف لهذا الملف.';
   static const String workspaceBinaryPreviewBlocked =
-      'الملف يبدو Binary أو غير نصي، لذلك المعاينة النصية متوقفة.';
+      'الملف يبدو Binary أو غير نصي، لذلك التحرير والحفظ متوقفين.';
   static const String workspaceFileOpenedLogPrefix = 'تم فتح الملف:';
   static const String workspaceFileOpenFailedPrefix = 'تعذر فتح الملف:';
+  static const String workspaceFileSavedLogPrefix = 'تم حفظ الملف:';
+  static const String workspaceFileSaveFailedPrefix = 'تعذر حفظ الملف:';
+  static const String workspaceFileSaveBlocked =
+      'الحفظ متوقف للملفات الكبيرة أو غير النصية.';
+  static const String workspaceFileUnsavedDiscardedLogPrefix =
+      'تم إغلاق تبويب بتعديلات غير محفوظة:';
   static const String workspaceTabClosedLogPrefix = 'تم إغلاق تبويب:';
   static const String workspaceNoActiveWorkspaceOpenFromHome =
       'لا توجد مساحة عمل نشطة. افتح مشروع من الصفحة الرئيسية.';
@@ -172,6 +178,11 @@ class AppStrings {
   static const String workspaceFilesEmpty =
       'لا توجد ملفات قابلة للعرض داخل هذا المشروع.';
   static const String workspaceEditorTitle = 'مساحة الكود والملفات';
+  static const String workspaceSaveFileButton = 'حفظ';
+  static const String workspaceEditorSaved = 'محفوظ';
+  static const String workspaceEditorUnsaved = 'غير محفوظ';
+  static const String workspaceEditorReadOnly = 'قراءة فقط';
+  static const String workspaceEditorSaving = 'جاري الحفظ';
   static const String workspaceNoOpenTabs = 'لا توجد ملفات مفتوحة';
   static const String workspaceReadyTitle = 'مساحة العمل جاهزة';
   static const String workspaceReadyMessage =

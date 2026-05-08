@@ -2249,3 +2249,64 @@ Manual test:
 
 Next step:
 - If checks pass and no overflow appears, commit/tag Step 19.
+
+---
+
+## Step 20 — Real Code Editor
+
+### الهدف
+تحويل مساحة معاينة الملفات في Workspace إلى محرر كود فعلي قابل للتعديل والحفظ باستخدام `flutter_code_editor`، مع حماية الملفات الكبيرة والـ binary.
+
+### ما تم تنفيذه
+- استبدال معاينة النص القديمة بمحرر `CodeField` داخل ملف مستقل:
+  - `lib/app/modules/work_space/views/sections/workspace_code_editor.dart`
+- إضافة دعم تعديل محتوى الملف النشط داخل `WorkSpaceController`.
+- إضافة زر حفظ في Header مساحة التحرير.
+- إضافة حالة الملف في الواجهة:
+  - محفوظ
+  - غير محفوظ
+  - قراءة فقط
+  - جاري الحفظ
+- إضافة مؤشر تعديلات غير محفوظة على تبويب الملف المفتوح.
+- حماية الملفات الكبيرة والـ binary من التحرير والحفظ.
+- حفظ الملف فعليًا على نفس المسار باستخدام `File.writeAsString`.
+- تحديث محتوى التبويب وحجم الملف بعد الحفظ.
+- تسجيل لوج عند فتح/حفظ/فشل حفظ/إغلاق ملف بتعديلات غير محفوظة.
+
+### الملفات المعدلة
+- `did.md`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/work_space/controllers/work_space_controller.dart`
+- `lib/app/modules/work_space/views/sections/workspace_editor_area.dart`
+
+### الملفات المضافة
+- `lib/app/modules/work_space/views/sections/workspace_code_editor.dart`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم إضافة Packages جديدة.
+- لم يتم إضافة Syntax language routing متقدم.
+- لم يتم إضافة confirmation dialog عند إغلاق تبويب غير محفوظ.
+- لم يتم إضافة autosave.
+- لم يتم تشغيل أو تعديل GGUF.
+- لم يتم تعديل Rust Engine.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب
+1. افتح Workspace.
+2. افتح ملف نصي صغير مثل `.dart` أو `.md`.
+3. عدّل سطر داخل المحرر.
+4. تأكد أن حالة الملف أصبحت `غير محفوظ` وأن التبويب عليه مؤشر.
+5. اضغط `حفظ`.
+6. تأكد أن الحالة رجعت `محفوظ`.
+7. افتح Terminal واكتب `cat path/to/file` أو افتح الملف من النظام للتأكد أن التعديل اتحفظ.
+8. جرّب فتح ملف كبير أو binary وتأكد أن الحفظ غير متاح.
+
+### الحالة
+بانتظار فحص مصطفى ونتيجة `flutter analyze` قبل اعتماد Step 20.

@@ -21,7 +21,7 @@ enum WorkSpaceBottomPanel { terminal, logs, problems, output }
 
 class WorkSpaceController extends GetxController {
   static const String _activeWorkspaceStorageKey = 'active_workspace';
-  static const int _maxPreviewBytes = 512 * 1024;
+  static const int _maxEditableBytes = 512 * 1024;
   static const int _terminalRows = 24;
   static const int _terminalColumns = 100;
 
@@ -68,6 +68,11 @@ class WorkSpaceController extends GetxController {
   final isTerminalStarting = false.obs;
   final terminalStatusMessage = AppStrings.workspaceTerminalStopped.obs;
   final terminalWorkingDirectory = ''.obs;
+  final dirtyFilePaths = <String>{}.obs;
+  final protectedFilePaths = <String>{}.obs;
+  final isSavingOpenedFile = false.obs;
+
+  final Map<String, String> _savedFileContentByPath = {};
 
   final isLoading = false.obs;
   final errorMessage = ''.obs;
@@ -88,6 +93,39 @@ class WorkSpaceController extends GetxController {
     final activePath = openedFilePath.value;
     if (activePath.isEmpty) return null;
     return openedFiles.firstWhereOrNull((file) => file.path == activePath);
+  }
+
+  bool get isActiveFileDirty {
+    dirtyFilePaths.length;
+    final activePath = openedFilePath.value;
+    if (activePath.isEmpty) return false;
+    return dirtyFilePaths.contains(activePath);
+  }
+
+  bool get isActiveFileEditable {
+    protectedFilePaths.length;
+    final activePath = openedFilePath.value;
+    if (activePath.isEmpty) return false;
+    return !protectedFilePaths.contains(activePath);
+  }
+
+  bool get canSaveActiveFile =>
+      hasOpenedFile &&
+      isActiveFileEditable &&
+      isActiveFileDirty &&
+      !isSavingOpenedFile.value;
+
+  String get activeEditorStatusLabel {
+    if (!hasOpenedFile) return '';
+    if (isSavingOpenedFile.value) return AppStrings.workspaceEditorSaving;
+    if (!isActiveFileEditable) return AppStrings.workspaceEditorReadOnly;
+    if (isActiveFileDirty) return AppStrings.workspaceEditorUnsaved;
+    return AppStrings.workspaceEditorSaved;
+  }
+
+  bool isFileDirty(String filePath) {
+    dirtyFilePaths.length;
+    return dirtyFilePaths.contains(filePath);
   }
 
   String get openedFileSubtitle {
@@ -365,15 +403,26 @@ class WorkSpaceController extends GetxController {
       final bytes = await file.readAsBytes();
       final relativePath = _relativePathFor(item.path);
       final sizeLabel = _formatBytes(item.sizeBytes);
+      var isEditable = true;
       late final String content;
 
-      if (bytes.length > _maxPreviewBytes) {
+      if (bytes.length > _maxEditableBytes) {
         content = AppStrings.workspaceLargeFilePreviewBlocked;
+        isEditable = false;
       } else if (_looksBinary(bytes)) {
         content = AppStrings.workspaceBinaryPreviewBlocked;
+        isEditable = false;
       } else {
         content = utf8.decode(bytes, allowMalformed: true);
       }
+
+      if (isEditable) {
+        protectedFilePaths.remove(item.path);
+      } else {
+        protectedFilePaths.add(item.path);
+      }
+      dirtyFilePaths.remove(item.path);
+      _savedFileContentByPath[item.path] = content;
 
       final openedFile = OpenedFileModel(
         name: item.name,
@@ -411,6 +460,70 @@ class WorkSpaceController extends GetxController {
     );
   }
 
+  void updateActiveOpenedFileContent(String content) {
+    final filePath = openedFilePath.value;
+    if (filePath.isEmpty || !isActiveFileEditable) return;
+
+    if (openedFileContent.value != content) {
+      openedFileContent.value = content;
+    }
+
+    final index = openedFiles.indexWhere((file) => file.path == filePath);
+    if (index != -1 && openedFiles[index].content != content) {
+      openedFiles[index] = openedFiles[index].copyWith(content: content);
+    }
+
+    final savedContent = _savedFileContentByPath[filePath] ?? '';
+    if (content == savedContent) {
+      dirtyFilePaths.remove(filePath);
+    } else {
+      dirtyFilePaths.add(filePath);
+    }
+  }
+
+  Future<void> saveActiveFile() async {
+    final filePath = openedFilePath.value;
+    if (filePath.isEmpty || isSavingOpenedFile.value) return;
+
+    final activeFile = activeOpenedFile;
+    if (activeFile == null) return;
+
+    if (!isActiveFileEditable) {
+      _pushWorkspaceLog(AppStrings.workspaceFileSaveBlocked);
+      return;
+    }
+
+    if (!isActiveFileDirty) return;
+
+    isSavingOpenedFile.value = true;
+    try {
+      final content = openedFileContent.value;
+      final file = File(filePath);
+      await file.writeAsString(content, flush: true);
+      final sizeLabel = _formatBytes(await file.length());
+      final index = openedFiles.indexWhere((item) => item.path == filePath);
+
+      _savedFileContentByPath[filePath] = content;
+      dirtyFilePaths.remove(filePath);
+      openedFileSizeLabel.value = sizeLabel;
+
+      if (index != -1) {
+        openedFiles[index] = openedFiles[index].copyWith(
+          content: content,
+          sizeLabel: sizeLabel,
+        );
+      }
+
+      _pushWorkspaceLog(
+        '${AppStrings.workspaceFileSavedLogPrefix} ${activeFile.relativePath}',
+      );
+    } catch (error) {
+      _pushWorkspaceLog('${AppStrings.workspaceFileSaveFailedPrefix} $error');
+    } finally {
+      isSavingOpenedFile.value = false;
+    }
+  }
+
   void closeOpenedFile(String filePath) {
     final closingIndex = openedFiles.indexWhere(
       (file) => file.path == filePath,
@@ -419,7 +532,20 @@ class WorkSpaceController extends GetxController {
 
     final wasActive = openedFilePath.value == filePath;
     final closedFile = openedFiles[closingIndex];
+    final hadUnsavedChanges = dirtyFilePaths.contains(filePath);
+
     openedFiles.removeAt(closingIndex);
+    dirtyFilePaths.remove(filePath);
+    protectedFilePaths.remove(filePath);
+    _savedFileContentByPath.remove(filePath);
+
+    if (hadUnsavedChanges) {
+      _pushWorkspaceLog(
+        '${AppStrings.workspaceFileUnsavedDiscardedLogPrefix} '
+        '${closedFile.relativePath}',
+      );
+    }
+
     _pushWorkspaceLog(
       '${AppStrings.workspaceTabClosedLogPrefix} ${closedFile.relativePath}',
     );
@@ -693,6 +819,9 @@ class WorkSpaceController extends GetxController {
 
   void _clearOpenedFileState() {
     openedFiles.clear();
+    dirtyFilePaths.clear();
+    protectedFilePaths.clear();
+    _savedFileContentByPath.clear();
     _clearActiveFile();
   }
 
