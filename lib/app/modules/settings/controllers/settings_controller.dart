@@ -13,7 +13,8 @@ import '../../../data/services/engine_client_service.dart';
 
 class SettingsController extends GetxController {
   final AppSettingsService settingsService = Get.find<AppSettingsService>();
-  final EngineClientService engineClientService = Get.find<EngineClientService>();
+  final EngineClientService engineClientService =
+      Get.find<EngineClientService>();
 
   final selectedSectionIndex = 2.obs;
   final isPickingModel = false.obs;
@@ -29,8 +30,10 @@ class SettingsController extends GetxController {
   final TextEditingController topPController = TextEditingController();
   final TextEditingController topKController = TextEditingController();
   final TextEditingController repeatPenaltyController = TextEditingController();
-  final TextEditingController presencePenaltyController = TextEditingController();
-  final TextEditingController promptTemplateController = TextEditingController();
+  final TextEditingController presencePenaltyController =
+      TextEditingController();
+  final TextEditingController promptTemplateController =
+      TextEditingController();
   final TextEditingController modelRoleController = TextEditingController();
   final TextEditingController loadPolicyController = TextEditingController();
   final TextEditingController ramPolicyController = TextEditingController();
@@ -201,7 +204,6 @@ class SettingsController extends GetxController {
       current.copyWith(unloadAfterResponse: value, keepModelLoaded: !value),
     );
   }
-
 
   Future<void> saveSystemPrompt({bool showSuccessMessage = true}) async {
     if (isSaving.value) return;

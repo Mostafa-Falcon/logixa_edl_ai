@@ -27,15 +27,18 @@ class ReusableSettingsTextField extends StatelessWidget {
   });
 
   List<TextInputFormatter>? get _inputFormatters {
-    if (keyboardType == null) return null;
+    final type = keyboardType;
+    if (type == null) return null;
 
-    final keyboardTypeName = keyboardType.toString();
-    final isNumericKeyboard =
-        keyboardTypeName.contains('number') || keyboardTypeName.contains('decimal');
+    if (type == TextInputType.number) {
+      return [FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))];
+    }
 
-    if (!isNumericKeyboard) return null;
+    if (type == const TextInputType.numberWithOptions(decimal: true)) {
+      return [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))];
+    }
 
-    return [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))];
+    return null;
   }
 
   @override
@@ -79,10 +82,7 @@ class ReusableSettingsTextField extends StatelessWidget {
                     padding: EdgeInsetsDirectional.only(end: AppSizes.sm.w),
                     child: suffix,
                   ),
-            suffixIconConstraints: BoxConstraints(
-              minWidth: 0,
-              minHeight: 42.h,
-            ),
+            suffixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 42.h),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSizes.radiusMd.r),
               borderSide: const BorderSide(color: AppColors.border),
