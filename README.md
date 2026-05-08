@@ -1,98 +1,96 @@
-تمام يا مصطفى 🩵
-الخلاصة المحددة: **إحنا دلوقتي عندنا UI شغال كبداية EDL، بس لازم نثبت الطريق قبل ما نكمل كود.** وأهم إضافة جديدة: **اختيار الموديل المحلي لازم يكون من الإعدادات، مش ثابت في الكود.**
+# Logixa EDL AI
+
+> Current reference after Review 02 — Documentation Reconciliation.
+>
+> This README describes the **current architecture and working direction** after the project reached real Flutter + Rust + llama-server execution through Step 24.
 
 ---
 
-## 1. اللي اتعمل فعليًا
-
-### المشروع الحالي
-
-اسم المشروع:
+## 1. Project Identity
 
 ```yaml
 name: logixa_edl_ai
+repo: https://github.com/Mostafa-Falcon/logixa_edl_ai
+current_phase: Audit & Roadmap Reset
+latest_confirmed_feature_step: Step 24 — Manual Runtime Model Router 4B/12B
 ```
 
-وده خلاص يبقى الاسم الرسمي للنسخة الجديدة.
+Logixa EDL AI is a local AI development/control environment.
 
-### الواجهة
-
-اتعمل:
+The product direction is:
 
 ```text
-Home Page
-Workspace Page
-Top Bar
-Activity Bar
-File Explorer
-Editor Preview
-Recent Workspaces
-New Project
-Open Folder
+Flutter Desktop App = EDL / IDE / Control Center
+Rust Engine         = local runtime, memory, model orchestration
+GGUF Models         = user-selected local models through Settings
+llama-server        = runtime backend managed by Rust
 ```
-
-والـ Workspace بقى يفتح ملفات المشروع فعليًا، والشجرة ظهرت شبه VS Code.
-
-### المشاكل اللي ظهرت واتصلحت جزئيًا
-
-ظهر عندنا:
-
-```text
-GetX Obx crash
-Workspace freeze
-Google Fonts network error
-Scrollbar controller error
-```
-
-واتفقنا إن التصميم لازم يتوحّد بين Home و Workspace، مش كل صفحة بشكل مختلف.
 
 ---
 
-## 2. القرارات المعمارية النهائية
+## 2. Core Architecture Decisions
 
-### القرار الأساسي
+### 2.1 Flutter responsibility
 
-```text
-Flutter = واجهة EDL / IDE / Control Center
-Rust Engine = القلب المحلي الحقيقي
-Local Model = يشتغل عند الطلب فقط
-```
-
-مش هنرجع لـ Python Engine، ولا LM Studio كأساس، ولا Ollama كأساس.
-
----
-
-## 3. سياسة تشغيل الموديل المحلي
-
-الموديل المحلي **مش هيشتغل مع فتح التطبيق**.
-
-السياسة النهائية:
+Flutter is responsible for:
 
 ```text
-المستخدم يفتح التطبيق
-↓
-Flutter يفتح الواجهة فقط
-↓
-Rust Engine ممكن يبقى جاهز وخفيف
-↓
-الموديل نفسه مش محمّل
-↓
-المستخدم يبعت رسالة
-↓
-لو local model enabled:
-    شغّل الموديل المختار
-    ابعت الرسالة + system prompt
-    استقبل الرد
-    خزّن المحادثة والذاكرة
-    اقفل/فرّغ الموديل بعد الرد
+- UI / UX
+- Workspace navigation
+- Settings and model profiles
+- Chat interface
+- Runtime status display
+- Data Center / Memory UI
+- Diagnostics and exports
 ```
 
-يعني الإعدادات الأساسية تبقى:
+Flutter must not contain hidden model paths or hidden prompts.
+
+### 2.2 Rust Engine responsibility
+
+Rust Engine is responsible for:
+
+```text
+- health/status endpoints
+- runtime state
+- model profile sync
+- llama-server process management
+- chat and streaming endpoints
+- memory persistence through SQLite
+- runtime safety rules
+```
+
+### 2.3 Local model policy
+
+The local model must not load automatically when the app opens.
+
+Policy:
+
+```text
+User opens app
+↓
+Flutter UI starts
+↓
+Rust Engine may be started lightly
+↓
+No GGUF model is loaded yet
+↓
+User sends a message
+↓
+If local model mode is enabled:
+  use the active model profile selected by the user
+  start llama-server if needed
+  send prompt
+  stream or return response
+  save final message when applicable
+  unload after response by default
+```
+
+Default runtime policy:
 
 ```json
 {
   "local_model_enabled": true,
-  "selected_model_profile_id": "default_local_model",
   "auto_start_on_message": true,
   "keep_model_loaded": false,
   "unload_after_response": true,
@@ -102,397 +100,217 @@ Rust Engine ممكن يبقى جاهز وخفيف
 
 ---
 
-## 4. إضافة مهمة: اختيار الموديل من الإعدادات
+## 3. Hard Rules
 
-دي لازم تدخل رسميًا في الخطة.
-
-المستخدم لازم يقدر من Settings يعمل:
+These rules are part of the project contract:
 
 ```text
-اختيار ملف موديل GGUF
-تغيير اسم الموديل
-تحديد context size
-تحديد threads
-تحديد batch size
-تحديد top_k
-تفعيل/إيقاف الموديل المحلي
-تحديد هل يقفل بعد كل رد ولا يفضل شغال
-اختيار البروفايل النشط
+1. No hardcoded GGUF model paths in Dart or Rust.
+2. Model path comes only from the user-selected Model Profile.
+3. No hidden/default System Prompt in Dart, Rust, JSON config, or examples.
+4. If System Prompt is empty, no system prompt is applied.
+5. 4B and 12B must not be loaded at the same time.
+6. 12B is allowed only as a user-selected Quality profile, with conservative policy.
+7. Auto Router is deferred until diagnostics and evaluation exist.
+8. Each implementation step must be small, testable, and logged in did.md.
+9. README.md, did.md, and todo.md must stay synchronized after this review.
+10. If the user adds a note during work, record it as a note without branching unless it is a blocker.
 ```
-
-شكل الـ model profile:
-
-```json
-{
-  "id": "gemma_fast_local",
-  "name": "Gemma Fast Local",
-  "model_path": "/home/logixa/models/gemma.gguf",
-  "context_size": 2048,
-  "threads": 6,
-  "batch_size": 256,
-  "temperature": 0.7,
-  "top_p": 0.9,
-  "top_k": 64,
-  "max_tokens": 512,
-  "is_active": true
-}
-```
-
-ممنوع نحط path ثابت للموديل في Dart أو Rust.
 
 ---
 
-## 5. حالة الباكدجات الحالية
+## 4. Current Implemented Capabilities
 
-الباكدجات اللي عندك كويسة جدًا للمرحلة الحالية.
-
-### موجود ومفيد
+The project currently includes:
 
 ```text
-get
-get_storage
-flutter_screenutil
-intl
-path
-path_provider
-file_picker
-watcher
-window_manager
-multi_split_view
-tabbed_view
-super_context_menu
-xterm
-flutter_pty
-flutter_code_editor
-desktop_drop
-drift
-drift_flutter
-uuid
-logger
-archive
-mime
-open_filex
+✅ Unified Flutter shell / control center
+✅ Home / Workspace / Settings / Chat / Data Center modules
+✅ Workspace file tree
+✅ Workspace sessions sync
+✅ Workspace context menu
+✅ Real terminal through xterm + flutter_pty
+✅ Real code editor with edit/save protection
+✅ Local model settings
+✅ Multiple model profiles
+✅ Active model profile sync to Rust
+✅ Dynamic user-saved system prompt
+✅ Rust Engine skeleton and status endpoints
+✅ Rust memory skeleton with SQLite
+✅ Chat page connected to runtime
+✅ llama-server adapter managed by Rust
+✅ Real GGUF inference
+✅ Streaming response
+✅ Stop generation control
+✅ Manual Runtime Router: Fast / 4B and Quality / 12B
+✅ Chat export for diagnostics
+✅ Hidden/default system prompt removed
 ```
 
-### مهم جدًا
+---
 
-`file_picker` يكفينا حاليًا لاختيار موديل GGUF من الإعدادات.
+## 5. Current Known Risks
 
-يعني نقدر نعمل Step اختيار الموديل **بدون إضافة باكدجات جديدة**.
+```text
+1. Documentation was behind the implementation before Review 02.
+2. Some files have grown too large and need hygiene splitting.
+3. Runtime diagnostics are not yet strong enough for comparing models.
+4. Model quality cannot be judged reliably without fixed test prompts and exported settings.
+5. Extensions must not be implemented before permission/safety planning.
+```
 
-### ناقص لاحقًا
+Files to review in the hygiene pass:
 
-لما نبدأ ربط Rust Engine:
+```text
+lib/app/data/services/engine_client_service.dart
+lib/app/modules/settings/controllers/settings_controller.dart
+lib/app/modules/chat_page/controllers/chat_page_controller.dart
+logixa_engine/src/runtime.rs
+```
+
+---
+
+## 6. Current Roadmap From This Point
+
+### Review 02 — Documentation Reconciliation
+
+Status: current step.
+
+Goal:
+
+```text
+- Rewrite README.md to describe the real current architecture.
+- Rewrite todo.md to define the next roadmap from the current state.
+- Add a Summary Index to did.md without deleting execution history.
+```
+
+### Step 25 — Codebase Hygiene Pass
+
+Goal: improve maintainability without changing behavior.
+
+Scope:
+
+```text
+- Split large services/controllers where needed.
+- Keep text in AppStrings.
+- Verify no hidden prompts or model paths.
+- Verify file permissions.
+- Verify ignored runtime files are not tracked.
+```
+
+### Step 26 — Runtime Diagnostics Panel
+
+Goal: make model/runtime behavior easy to inspect.
+
+Scope:
+
+```text
+- Active model profile details
+- llama-server path/status
+- runtime stage
+- last error
+- sampling settings
+- prompt template
+- system prompt state
+- fixed test prompt button
+- copy diagnostic report button
+```
+
+### Step 27 — Model Evaluation Harness
+
+Goal: compare models using stable prompts.
+
+Scope:
+
+```text
+- Fixed test prompt set
+- Fast vs Quality comparison
+- response time
+- runtime stage
+- final response export
+- no automatic model switching
+```
+
+### Step 28 — Extensions System Planning
+
+Goal: plan extensions safely before implementation.
+
+Scope:
+
+```text
+- extension manifest
+- storage location
+- permissions
+- Flutter-only vs Rust tool extensions
+- enable/disable policy
+- logging
+- no external code execution without explicit approval
+```
+
+---
+
+## 7. Execution Workflow
+
+Every implementation step must follow this order:
+
+```text
+1. Review README.md
+2. Review did.md
+3. Review todo.md
+4. Define one exact target
+5. Modify only the necessary files
+6. Update did.md
+7. Run checks
+8. Commit + tag after success
+```
+
+Standard checks:
 
 ```bash
-flutter pub add dio web_socket_channel
+flutter analyze
+flutter run -d linux
+
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
 ```
 
-ولما نستخدم Drift بجد مع code generation:
-
-```bash
-flutter pub add --dev build_runner drift_dev
-```
-
-### ملاحظة مهمة عن google_fonts
-
-خليه موجود، بس حاليًا **ما نعتمدش عليه في runtime** لأن حصل error لما حاول يحمل خط من الإنترنت.
-الأفضل لاحقًا نحط الخطوط كـ assets محلية.
+Run Rust checks only when Rust files are touched.
 
 ---
 
-# الخطة بالترتيب
+## 8. GitHub Hygiene
 
-## Step 1 — تثبيت التصميم الموحد
-
-الهدف:
+Never commit:
 
 ```text
-Home و Workspace يستخدموا نفس:
-ActivityBar
-TopBar
-Panel/Card style
-Text style
-Spacing
-Colors
+models/
+*.gguf
+logixa_engine/logixa_engine_config.json
+logixa_engine/logixa_engine_memory.sqlite
+logixa_engine/target/
+build/
+.dart_tool/
 ```
 
-ممنوع صفحة تبقى Dashboard style وصفحة تبقى VS Code style.
-
-الناتج:
-
-```text
-تصميم موحد ومستقر
-```
+If a ZIP or generated artifact appears in the project root, inspect before committing.
 
 ---
 
-## Step 2 — Settings Page
+## 9. Deferred Work
 
-نعمل صفحة إعدادات حقيقية:
-
-```text
-/settings
-```
-
-وفيها أقسام:
+These are intentionally deferred:
 
 ```text
-General
-Appearance
-Local Model
-Workspace
-Memory
+- Auto model router
+- Long 12B stress testing
+- Extensions implementation
+- External tools execution
+- Packaging/release installer
+- Cloud sync
+- Firebase backup
+- Advanced memory search
 ```
 
-في المرحلة دي ننفذ بس:
-
-```text
-Local Model Settings
-```
-
----
-
-## Step 3 — Local Model Settings
-
-نضيف:
-
-```text
-زر اختيار ملف موديل
-عرض اسم الموديل
-عرض مسار الموديل
-تفعيل/إيقاف الموديل المحلي
-context size
-threads
-batch size
-max tokens
-temperature
-top_p
-top_k
-keep model loaded
-unload after response
-```
-
-التخزين مؤقتًا بـ:
-
-```text
-GetStorage
-```
-
-لحد ما Rust Engine و SQLite يدخلوا.
-
----
-
-## Step 4 — Model Profile System
-
-بدل إعداد موديل واحد، نعمل Profiles:
-
-```text
-ModelProfile
-```
-
-مثلاً:
-
-```text
-Gemma Fast
-Qwen Small
-Dev Expert Model
-Arabic Chat Model
-```
-
-المستخدم يقدر:
-
-```text
-Add Profile
-Edit Profile
-Set Active
-Delete Profile
-```
-
-بس في الأول نبدأ بـ:
-
-```text
-Single active model profile
-```
-
-عشان ما نوسعش بدري.
-
----
-
-## Step 5 — Workspace Tree Polish
-
-الشجرة الحالية اشتغلت، بس محتاجة تتظبط:
-
-```text
-expand / collapse مضبوط
-icons أوضح
-ignore folders ثابت
-right click لاحقًا
-open file in editor
-tabs لاحقًا
-```
-
-ونستخدم:
-
-```text
-super_context_menu
-tabbed_view
-multi_split_view
-```
-
-بس بالترتيب، مش كله مرة واحدة.
-
----
-
-## Step 6 — Editor Tabs
-
-نحوّل فتح الملف من preview واحد إلى tabs:
-
-```text
-Opened Files Tabs
-Active File
-Close Tab
-Unsaved Indicator لاحقًا
-```
-
-هنا نستخدم:
-
-```text
-tabbed_view
-flutter_code_editor
-```
-
----
-
-## Step 7 — Bottom Panel
-
-نضيف Panel سفلي شبه VS Code:
-
-```text
-Terminal
-Logs
-Problems
-Output
-```
-
-هنا نستفيد من:
-
-```text
-xterm
-flutter_pty
-logger
-```
-
----
-
-## Step 8 — Rust Engine Skeleton
-
-نعمل مجلد:
-
-```text
-logixa_engine/
-```
-
-ونبدأ Rust Engine خفيف:
-
-```text
-health endpoint
-status endpoint
-settings endpoint
-```
-
-بعدها Flutter يكلمه.
-
-هنا نضيف:
-
-```bash
-flutter pub add dio web_socket_channel
-```
-
----
-
-## Step 9 — Runtime Model Manager
-
-في Rust:
-
-```text
-يقرأ active model profile
-يشغل الموديل عند الرسالة
-يبعت prompt
-يرجع response
-يقفل الموديل بعد الرد
-```
-
-ده مش دلوقتي قبل ما Settings و Profiles يثبتوا.
-
----
-
-## Step 10 — Memory System
-
-الذاكرة الأساسية لاحقًا تبقى:
-
-```text
-Rust + SQLite
-```
-
-وتخزن:
-
-```text
-conversations
-messages
-memory_items
-selected_model_profile
-experts
-workspace_sessions
-```
-
-Firebase يفضل مؤجل كـ:
-
-```text
-backup / sync
-```
-
-مش core memory.
-
----
-
-# الترتيب اللي نمشي عليه من دلوقتي
-
-ننفذ بالضبط:
-
-```text
-1. توحيد التصميم نهائيًا
-2. Settings Page
-3. Local Model Settings
-4. حفظ إعدادات الموديل بـ GetStorage
-5. Model Profile واحد active
-6. تحسين Workspace Tree
-7. Editor Tabs
-8. Bottom Terminal/Logs
-9. Rust Engine Skeleton
-10. Runtime Model Manager
-```
-
-## الخطوة الجاية مباشرة
-
-**Step 2: نعمل Settings Page + Local Model Settings.**
-
-في الخطوة دي مش هنشغل موديل.
-بس هنخلي المستخدم يختار الموديل من الإعدادات ويتحفظ المسار والبروفايل.
-
-ده أساس مهم جدًا قبل Rust Engine، عشان لما نيجي نشغل الموديل يبقى معروف هيشغل أنهي موديل وبأي إعدادات.
-
-
-
-
-
-
-
-ملحوظات تم ذكرها من قبل GPT:
-للعلم وليس للتنفيذ حاليا قابلة للنقاش بعد تنفيذ الخطوات الاساسية: 
-### ما لم يتم تنفيذه عمدًا
-- لم يتم تشغيل موديل محلي فعليًا.
-- لم يتم إنشاء Rust Engine في هذه الخطوة.
-- لم يتم استخدام Drift أو توليد Tables.
-- لم يتم تعديل README.md.
-- لم يتم إضافة Model Profiles متعددة؛ تم تنفيذ Single Active Model Profile فقط كما هو مذكور في README لتجنب التوسع المبكر.
+They should only be pulled forward after discussion.
