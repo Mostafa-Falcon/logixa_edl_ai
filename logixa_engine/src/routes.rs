@@ -9,12 +9,12 @@ use crate::{
     state::EngineState,
 };
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     response::{
         sse::{KeepAlive, Sse},
         IntoResponse,
     },
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -98,6 +98,11 @@ struct MessagesQuery {
     conversation_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct DeleteConversationQuery {
+    conversation_id: String,
+}
+
 pub fn router(state: EngineState) -> Router {
     Router::new()
         .route("/health", get(health))
@@ -113,7 +118,13 @@ pub fn router(state: EngineState) -> Router {
         .route("/memory/status", get(memory_status))
         .route(
             "/memory/conversations",
-            get(list_memory_conversations).post(create_memory_conversation),
+            get(list_memory_conversations)
+                .post(create_memory_conversation)
+                .delete(delete_memory_conversation_by_query),
+        )
+        .route(
+            "/memory/conversations/{conversation_id}",
+            delete(delete_memory_conversation),
         )
         .route(
             "/memory/messages",
@@ -307,6 +318,20 @@ async fn create_memory_conversation(
 
 async fn list_memory_conversations(State(state): State<EngineState>) -> impl IntoResponse {
     json_result(state.memory.list_conversations())
+}
+
+async fn delete_memory_conversation(
+    State(state): State<EngineState>,
+    Path(conversation_id): Path<String>,
+) -> impl IntoResponse {
+    json_result(state.memory.delete_conversation(conversation_id))
+}
+
+async fn delete_memory_conversation_by_query(
+    State(state): State<EngineState>,
+    Query(query): Query<DeleteConversationQuery>,
+) -> impl IntoResponse {
+    json_result(state.memory.delete_conversation(query.conversation_id))
 }
 
 async fn create_memory_message(

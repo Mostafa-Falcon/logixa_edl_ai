@@ -3136,3 +3136,156 @@ flutter run -d linux
 
 ### الخطوة القادمة
 `Step 25.4 — Extract Runtime Chat Client` أو مراجعة تأثير التقسيم قبل الاستمرار.
+
+## Step 26 — Chat sessions sidebar
+
+Goal:
+- Add a right-side previous sessions panel to the local chat screen.
+
+Changed:
+- Added a reusable chat sessions side panel beside the active chat.
+- Added loading/empty/error states for saved conversations.
+- Added open/select conversation behavior so previous memory messages load into the chat and future messages continue in the same conversation.
+- Added new session reset behavior.
+- Added delete conversation UI with confirmation dialog.
+- Added Flutter Engine client delete call for Rust Memory conversations.
+- Added Arabic UI strings for sessions, refresh, delete, and failure states.
+
+Files changed:
+- lib/app/constants/app_strings.dart
+- lib/app/data/services/engine_client_service.dart
+- lib/app/modules/chat_page/controllers/chat_page_controller.dart
+- lib/app/modules/chat_page/views/chat_page_view.dart
+- lib/app/modules/chat_page/views/sections/chat_sessions_side_panel.dart
+
+Deferred:
+- If Rust Engine does not already expose DELETE /memory/conversations/{id} or the fallback DELETE /memory/conversations?conversation_id=..., implement the matching Rust endpoint in the next backend step.
+
+Checks:
+- flutter analyze
+- flutter run -d linux
+
+## Step 26.1 — Repair conversation delete endpoint
+
+- Goal: fix the 405 error when deleting a chat session from the right-side chat sessions panel.
+- What changed:
+  - Added Rust memory deletion support for a conversation and its messages.
+  - Added `DELETE /memory/conversations/{conversation_id}` route in Rust Engine.
+  - Kept Flutter behavior unchanged; the existing delete button now targets a supported endpoint.
+- Files changed:
+  - `logixa_engine/src/memory.rs`
+  - `logixa_engine/src/routes.rs`
+  - `did.md`
+- Deferred:
+  - No UI redesign in this repair step.
+  - No README.md or todo.md changes because this is a small endpoint repair under the current memory/chat scope.
+- Checks to run:
+  - `cargo fmt --manifest-path logixa_engine/Cargo.toml`
+  - `cargo check --manifest-path logixa_engine/Cargo.toml`
+  - `flutter analyze`
+  - `flutter run -d linux`
+- Next step:
+  - Verify delete from the sessions sidebar removes the selected session and refreshes the list without a 405 error.
+
+## Step 26.2 — Repair conversation delete fallback 405
+
+- Goal: fix the remaining 405 error shown when deleting a previous chat session from the right-side sessions panel.
+- What changed:
+  - Kept `DELETE /memory/conversations/{conversation_id}` supported.
+  - Added fallback-compatible `DELETE /memory/conversations?conversation_id=...` support in Rust Engine.
+  - Ensured conversation deletion removes related messages first through the memory service.
+- Files changed:
+  - `logixa_engine/src/memory.rs`
+  - `logixa_engine/src/routes.rs`
+  - `did.md`
+- Deferred:
+  - No visual/UI changes in this repair step.
+  - No README.md or todo.md change because this is a narrow bug repair for the current chat sessions feature.
+- Checks to run:
+  - `cargo fmt --manifest-path logixa_engine/Cargo.toml`
+  - `cargo check --manifest-path logixa_engine/Cargo.toml`
+  - `flutter analyze`
+  - Restart Rust Engine / rerun the app, then test deleting a session.
+- Next step:
+  - Verify the delete button removes the session without showing a 405 snackbar.
+
+
+## Step 27 — Add Qwen3 4B thinking profile support
+
+### Goal
+Add Qwen3-4B-Q4_K_M as a first-class local GGUF profile option with explicit No-Think and Thinking modes.
+
+### What changed
+- Added Qwen3 4B No-Think Fast preset.
+- Added Qwen3 4B Thinking preset.
+- Added `min_p` and `enable_thinking` to Flutter model profiles and Rust model profile config.
+- Added UI controls for Min P and Thinking Mode in the active model profile form.
+- Updated the manual runtime router so Quality can target a Thinking profile, not only 12B.
+- Rust runtime now sends `top_k`, `min_p`, `repeat_penalty`, and `presence_penalty` to llama-server.
+- Rust runtime sends Qwen thinking control through `chat_template_kwargs.enable_thinking` and a Qwen-only `/think` or `/no_think` system switch.
+- Rust runtime keeps normal system prompts as system messages; Qwen system prompts remain supported.
+- Runtime output strips `<think>...</think>` blocks from stored/displayed assistant text.
+
+### Files changed
+- `lib/app/data/models/model_profile_model.dart`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/settings/controllers/settings_controller.dart`
+- `lib/app/modules/settings/views/sections/model_profiles_section.dart`
+- `lib/app/modules/settings/views/sections/active_model_profile_form_section.dart`
+- `lib/app/widgets/reusable_widgets/reusable_model_profile_card.dart`
+- `logixa_engine/src/model_profile.rs`
+- `logixa_engine/src/runtime.rs`
+- `did.md`
+
+### Checks to run
+- `cargo check --manifest-path logixa_engine/Cargo.toml`
+- `flutter analyze`
+- `flutter run -d linux`
+
+### Deferred
+- If the installed llama.cpp build does not support request-level `chat_template_kwargs`, Qwen still receives `/think` or `/no_think` as a system switch.
+- Full per-conversation model history policy is still deferred.
+
+### Next step
+Test Qwen3-4B-Q4_K_M with No-Think first, then test Thinking mode with a longer reasoning task.
+
+## Step 27.1 — Show Qwen thinking and remove static chat system card
+
+### Goal
+Show model thinking when Qwen3 emits reasoning, and remove the fixed blue System welcome bubble from the chat page.
+
+### What changed
+- Removed the static chat welcome/System bubble from new and empty conversations.
+- Added optional `reasoningContent` to chat messages.
+- Added a thinking panel inside assistant bubbles when reasoning exists.
+- Flutter now handles `reasoning_token` SSE events from Rust Runtime.
+- Rust Runtime now separates visible answer text from `<think>...</think>` reasoning blocks.
+- Rust Runtime also supports direct `reasoning_content` / `reasoning_delta` fields if llama-server returns them.
+- Assistant visible answer is still stored as the main message; reasoning is stored in metadata under `reasoning_content`.
+- Kept Qwen3 4B No-Think and Thinking profile support from Step 27 in the same patched files.
+
+### Files changed
+- `lib/app/data/models/model_profile_model.dart`
+- `lib/app/data/models/chat_message_model.dart`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/settings/controllers/settings_controller.dart`
+- `lib/app/modules/settings/views/sections/model_profiles_section.dart`
+- `lib/app/modules/settings/views/sections/active_model_profile_form_section.dart`
+- `lib/app/modules/chat_page/controllers/chat_page_controller.dart`
+- `lib/app/widgets/reusable_widgets/reusable_model_profile_card.dart`
+- `lib/app/widgets/reusable_widgets/reusable_chat_bubble.dart`
+- `logixa_engine/src/model_profile.rs`
+- `logixa_engine/src/runtime.rs`
+- `did.md`
+
+### Checks to run
+- `cargo check --manifest-path logixa_engine/Cargo.toml`
+- `flutter analyze`
+- `flutter run -d linux`
+
+### Deferred
+- Collapsible/manual hide-show controls for the thinking panel can be added later if the visible panel becomes too tall.
+
+### Next step
+Test Qwen3 Thinking with a reasoning-heavy prompt and verify the final answer appears separately from the thinking panel.

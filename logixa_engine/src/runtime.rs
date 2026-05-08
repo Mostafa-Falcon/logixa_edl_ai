@@ -107,6 +107,7 @@ pub struct RuntimeChatResponse {
     pub stage: RuntimeStage,
     pub active_model_profile_id: Option<String>,
     pub generated_text: Option<String>,
+    pub reasoning_text: Option<String>,
     pub message: String,
     pub system_prompt_applied: bool,
     pub system_prompt_chars: usize,
@@ -115,6 +116,12 @@ pub struct RuntimeChatResponse {
 }
 
 pub type RuntimeSseStream = ReceiverStream<Result<Event, Infallible>>;
+
+#[derive(Debug, Clone, Default)]
+struct RuntimeGeneratedText {
+    visible_text: String,
+    reasoning_text: Option<String>,
+}
 
 impl RuntimeManager {
     pub async fn snapshot(&self) -> RuntimeSnapshot {
@@ -268,6 +275,7 @@ impl RuntimeManager {
             stage: snapshot.stage,
             active_model_profile_id: snapshot.active_model_profile_id,
             generated_text: Some(generated_text),
+            reasoning_text: None,
             message: if stopped_after_response {
                 "llama-server response completed and runtime unloaded".to_string()
             } else {
@@ -369,20 +377,8 @@ impl RuntimeManager {
         system_prompt: Option<&str>,
         user_prompt: &str,
     ) -> Result<String, String> {
-        let mut messages = Vec::new();
-        if let Some(system_prompt) = system_prompt {
-            messages.push(json!({"role": "system", "content": system_prompt}));
-        }
-        messages.push(json!({"role": "user", "content": user_prompt}));
-
-        let body = json!({
-            "model": profile.id.clone(),
-            "stream": false,
-            "max_tokens": profile.max_tokens,
-            "temperature": profile.temperature,
-            "top_p": profile.top_p,
-            "messages": messages
-        });
+        let messages = build_chat_messages(profile, system_prompt, user_prompt);
+        let body = build_chat_completion_body(profile, false, messages);
 
         let response = self
             .client
@@ -583,11 +579,11 @@ impl RuntimeManager {
         )
         .await;
 
-        let generated_text = match self
+        let generated = match self
             .send_chat_completion_stream(&profile, system_prompt.as_deref(), &prompt, &sender)
             .await
         {
-            Ok(text) => text,
+            Ok(generated) => generated,
             Err(message) => {
                 let response = self
                     .fail(
@@ -631,7 +627,8 @@ impl RuntimeManager {
             model_loaded: snapshot.model_loaded,
             stage: snapshot.stage,
             active_model_profile_id: snapshot.active_model_profile_id,
-            generated_text: Some(generated_text),
+            generated_text: Some(generated.visible_text),
+            reasoning_text: generated.reasoning_text,
             message: if stopped_after_response {
                 "llama-server streaming response completed and runtime unloaded".to_string()
             } else {
@@ -651,21 +648,9 @@ impl RuntimeManager {
         system_prompt: Option<&str>,
         user_prompt: &str,
         sender: &mpsc::Sender<Result<Event, Infallible>>,
-    ) -> Result<String, String> {
-        let mut messages = Vec::new();
-        if let Some(system_prompt) = system_prompt {
-            messages.push(json!({"role": "system", "content": system_prompt}));
-        }
-        messages.push(json!({"role": "user", "content": user_prompt}));
-
-        let body = json!({
-            "model": profile.id.clone(),
-            "stream": true,
-            "max_tokens": profile.max_tokens,
-            "temperature": profile.temperature,
-            "top_p": profile.top_p,
-            "messages": messages
-        });
+    ) -> Result<RuntimeGeneratedText, String> {
+        let messages = build_chat_messages(profile, system_prompt, user_prompt);
+        let body = build_chat_completion_body(profile, true, messages);
 
         let response = self
             .client
@@ -687,7 +672,9 @@ impl RuntimeManager {
             ));
         }
 
-        let mut full_text = String::new();
+        let mut visible_text = String::new();
+        let mut reasoning_text = String::new();
+        let mut thinking_capture = ThinkingTagCapture::default();
         let mut line_buffer = String::new();
         let mut stream = response.bytes_stream();
 
@@ -715,7 +702,21 @@ impl RuntimeManager {
                 };
                 let data = data.trim();
                 if data == "[DONE]" {
-                    return Ok(full_text.trim().to_string());
+                    let tail = thinking_capture.finish();
+                    stream_capture_delta(
+                        sender,
+                        profile,
+                        &self.server_url,
+                        &mut visible_text,
+                        &mut reasoning_text,
+                        tail,
+                    )
+                    .await;
+
+                    return Ok(RuntimeGeneratedText {
+                        visible_text: visible_text.trim().to_string(),
+                        reasoning_text: clean_optional_text(&reasoning_text),
+                    });
                 }
 
                 let value: Value = match serde_json::from_str(data) {
@@ -723,27 +724,53 @@ impl RuntimeManager {
                     Err(_) => continue,
                 };
 
+                if let Some(reasoning_delta) = extract_stream_reasoning_delta(&value) {
+                    if !reasoning_delta.is_empty() {
+                        stream_reasoning_delta(
+                            sender,
+                            profile,
+                            &self.server_url,
+                            &mut reasoning_text,
+                            reasoning_delta,
+                        )
+                        .await;
+                    }
+                }
+
                 if let Some(delta) = extract_stream_delta(&value) {
                     if delta.is_empty() {
                         continue;
                     }
-                    full_text.push_str(&delta);
-                    send_stream_event(
+
+                    let captured = thinking_capture.push(&delta);
+                    stream_capture_delta(
                         sender,
-                        "token",
-                        json!({
-                            "delta": delta,
-                            "stage": "generating",
-                            "active_model_profile_id": profile.id.clone(),
-                            "server_url": self.server_url.clone(),
-                        }),
+                        profile,
+                        &self.server_url,
+                        &mut visible_text,
+                        &mut reasoning_text,
+                        captured,
                     )
                     .await;
                 }
             }
         }
 
-        Ok(full_text.trim().to_string())
+        let tail = thinking_capture.finish();
+        stream_capture_delta(
+            sender,
+            profile,
+            &self.server_url,
+            &mut visible_text,
+            &mut reasoning_text,
+            tail,
+        )
+        .await;
+
+        Ok(RuntimeGeneratedText {
+            visible_text: visible_text.trim().to_string(),
+            reasoning_text: clean_optional_text(&reasoning_text),
+        })
     }
 
     async fn stop_llama_server(&self) -> Result<(), String> {
@@ -778,6 +805,7 @@ impl RuntimeManager {
             stage: snapshot.stage,
             active_model_profile_id: snapshot.active_model_profile_id,
             generated_text: None,
+            reasoning_text: None,
             message,
             system_prompt_applied: false,
             system_prompt_chars: snapshot.last_system_prompt_chars,
@@ -809,6 +837,7 @@ impl RuntimeManager {
             stage: snapshot.stage,
             active_model_profile_id: snapshot.active_model_profile_id,
             generated_text: None,
+            reasoning_text: None,
             message,
             system_prompt_applied: false,
             system_prompt_chars: snapshot.last_system_prompt_chars,
@@ -845,6 +874,7 @@ impl RuntimeManager {
             stage: snapshot.stage,
             active_model_profile_id: snapshot.active_model_profile_id,
             generated_text: None,
+            reasoning_text: None,
             message,
             system_prompt_applied,
             system_prompt_chars,
@@ -953,6 +983,272 @@ fn runtime_server_port() -> u16 {
         .unwrap_or(DEFAULT_LLAMA_SERVER_PORT)
 }
 
+fn build_chat_messages(
+    profile: &ModelProfileConfig,
+    system_prompt: Option<&str>,
+    user_prompt: &str,
+) -> Vec<Value> {
+    let mut messages = Vec::new();
+    let thinking_switch = qwen_thinking_switch(profile);
+
+    match (system_prompt.map(str::trim).filter(|value| !value.is_empty()), thinking_switch) {
+        (Some(system_prompt), Some(switch)) => {
+            messages.push(json!({
+                "role": "system",
+                "content": format!("{system_prompt}\n\n{switch}")
+            }));
+        }
+        (Some(system_prompt), None) => {
+            messages.push(json!({"role": "system", "content": system_prompt}));
+        }
+        (None, Some(switch)) => {
+            messages.push(json!({"role": "system", "content": switch}));
+        }
+        (None, None) => {}
+    }
+
+    messages.push(json!({"role": "user", "content": user_prompt}));
+    messages
+}
+
+fn build_chat_completion_body(
+    profile: &ModelProfileConfig,
+    stream: bool,
+    messages: Vec<Value>,
+) -> Value {
+    let mut body = json!({
+        "model": profile.id.clone(),
+        "stream": stream,
+        "max_tokens": profile.max_tokens,
+        "temperature": profile.temperature,
+        "top_p": profile.top_p,
+        "top_k": profile.top_k,
+        "min_p": profile.min_p,
+        "repeat_penalty": profile.repeat_penalty,
+        "presence_penalty": profile.presence_penalty,
+        "messages": messages
+    });
+
+    if is_qwen_profile(profile) {
+        if let Some(object) = body.as_object_mut() {
+            object.insert(
+                "chat_template_kwargs".to_string(),
+                json!({"enable_thinking": profile.enable_thinking}),
+            );
+        }
+    }
+
+    body
+}
+
+fn qwen_thinking_switch(profile: &ModelProfileConfig) -> Option<&'static str> {
+    if !is_qwen_profile(profile) {
+        return None;
+    }
+
+    Some(if profile.enable_thinking {
+        "/think"
+    } else {
+        "/no_think"
+    })
+}
+
+fn is_qwen_profile(profile: &ModelProfileConfig) -> bool {
+    let marker = format!(
+        "{} {} {}",
+        profile.id.to_lowercase(),
+        profile.name.to_lowercase(),
+        profile.model_path.to_lowercase()
+    );
+    marker.contains("qwen")
+}
+
+#[derive(Debug, Clone, Default)]
+struct ThinkingCaptureDelta {
+    visible: String,
+    reasoning: String,
+}
+
+#[derive(Default)]
+struct ThinkingTagCapture {
+    pending: String,
+    inside_think: bool,
+}
+
+impl ThinkingTagCapture {
+    fn push(&mut self, delta: &str) -> ThinkingCaptureDelta {
+        self.pending.push_str(delta);
+        let mut captured = ThinkingCaptureDelta::default();
+
+        loop {
+            if self.inside_think {
+                if let Some(end_index) = self.pending.find("</think>") {
+                    captured.reasoning.push_str(&self.pending[..end_index]);
+                    self.pending.drain(..end_index + "</think>".len());
+                    self.inside_think = false;
+                    continue;
+                }
+
+                let keep = partial_end_tag_suffix_len(&self.pending);
+                let split_at = self.pending.len().saturating_sub(keep);
+                captured.reasoning.push_str(&self.pending[..split_at]);
+                self.pending = self.pending[split_at..].to_string();
+                break;
+            }
+
+            if let Some(start_index) = self.pending.find("<think>") {
+                captured.visible.push_str(&self.pending[..start_index]);
+                self.pending.drain(..start_index + "<think>".len());
+                self.inside_think = true;
+                continue;
+            }
+
+            let keep = partial_start_tag_suffix_len(&self.pending);
+            let split_at = self.pending.len().saturating_sub(keep);
+            captured.visible.push_str(&self.pending[..split_at]);
+            self.pending = self.pending[split_at..].to_string();
+            break;
+        }
+
+        captured
+    }
+
+    fn finish(&mut self) -> ThinkingCaptureDelta {
+        let mut captured = ThinkingCaptureDelta::default();
+
+        if self.inside_think {
+            if let Some(end_index) = self.pending.find("</think>") {
+                captured.reasoning.push_str(&self.pending[..end_index]);
+                let after_end = end_index + "</think>".len();
+                captured.visible.push_str(&strip_think_blocks(&self.pending[after_end..]));
+            } else {
+                captured.reasoning.push_str(&self.pending);
+            }
+        } else {
+            captured.visible.push_str(&strip_think_blocks(&self.pending));
+        }
+
+        self.pending.clear();
+        self.inside_think = false;
+        captured
+    }
+}
+
+fn strip_think_blocks(value: &str) -> String {
+    let mut remaining = value.to_string();
+    let mut output = String::new();
+
+    loop {
+        let Some(start_index) = remaining.find("<think>") else {
+            output.push_str(&remaining);
+            break;
+        };
+
+        output.push_str(&remaining[..start_index]);
+        let after_start = start_index + "<think>".len();
+        let after = remaining[after_start..].to_string();
+
+        if let Some(end_index) = after.find("</think>") {
+            remaining = after[end_index + "</think>".len()..].to_string();
+        } else {
+            break;
+        }
+    }
+
+    output
+}
+
+fn partial_start_tag_suffix_len(value: &str) -> usize {
+    let tag = "<think>";
+
+    for len in (1..tag.len()).rev() {
+        if value.ends_with(&tag[..len]) {
+            return len;
+        }
+    }
+
+    0
+}
+
+fn partial_end_tag_suffix_len(value: &str) -> usize {
+    let tag = "</think>";
+
+    for len in (1..tag.len()).rev() {
+        if value.ends_with(&tag[..len]) {
+            return len;
+        }
+    }
+
+    0
+}
+
+async fn stream_capture_delta(
+    sender: &mpsc::Sender<Result<Event, Infallible>>,
+    profile: &ModelProfileConfig,
+    server_url: &str,
+    visible_text: &mut String,
+    reasoning_text: &mut String,
+    captured: ThinkingCaptureDelta,
+) {
+    if !captured.reasoning.is_empty() {
+        stream_reasoning_delta(
+            sender,
+            profile,
+            server_url,
+            reasoning_text,
+            captured.reasoning,
+        )
+        .await;
+    }
+
+    if captured.visible.is_empty() {
+        return;
+    }
+
+    visible_text.push_str(&captured.visible);
+    send_stream_event(
+        sender,
+        "token",
+        json!({
+            "delta": captured.visible,
+            "stage": "generating",
+            "active_model_profile_id": profile.id.clone(),
+            "server_url": server_url,
+        }),
+    )
+    .await;
+}
+
+async fn stream_reasoning_delta(
+    sender: &mpsc::Sender<Result<Event, Infallible>>,
+    profile: &ModelProfileConfig,
+    server_url: &str,
+    reasoning_text: &mut String,
+    reasoning_delta: String,
+) {
+    reasoning_text.push_str(&reasoning_delta);
+    send_stream_event(
+        sender,
+        "reasoning_token",
+        json!({
+            "reasoning_delta": reasoning_delta,
+            "stage": "thinking",
+            "active_model_profile_id": profile.id.clone(),
+            "server_url": server_url,
+        }),
+    )
+    .await;
+}
+
+fn clean_optional_text(value: &str) -> Option<String> {
+    let clean = value.trim();
+    if clean.is_empty() {
+        None
+    } else {
+        Some(clean.to_string())
+    }
+}
+
 async fn send_stream_event(
     sender: &mpsc::Sender<Result<Event, Infallible>>,
     event_name: &str,
@@ -974,14 +1270,33 @@ fn extract_stream_delta(value: &Value) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
+fn extract_stream_reasoning_delta(value: &Value) -> Option<String> {
+    value
+        .pointer("/choices/0/delta/reasoning_content")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            value
+                .pointer("/choices/0/delta/reasoning")
+                .and_then(Value::as_str)
+        })
+        .or_else(|| {
+            value
+                .pointer("/choices/0/message/reasoning_content")
+                .and_then(Value::as_str)
+        })
+        .or_else(|| value.pointer("/reasoning_delta").and_then(Value::as_str))
+        .or_else(|| value.pointer("/reasoning_content").and_then(Value::as_str))
+        .map(ToOwned::to_owned)
+}
+
 fn extract_generated_text(value: &Value) -> Option<String> {
     value
         .pointer("/choices/0/message/content")
         .and_then(Value::as_str)
         .or_else(|| value.pointer("/choices/0/text").and_then(Value::as_str))
-        .map(str::trim)
+        .map(strip_think_blocks)
+        .map(|text| text.trim().to_string())
         .filter(|text| !text.is_empty())
-        .map(ToOwned::to_owned)
 }
 
 fn preview_text(value: &str, max_chars: usize) -> String {

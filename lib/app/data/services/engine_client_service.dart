@@ -60,6 +60,7 @@ class EngineRuntimeChatResult {
   final String message;
   final String stage;
   final String? generatedText;
+  final String? reasoningText;
   final String? activeModelProfileId;
   final bool accepted;
   final bool modelStarted;
@@ -75,6 +76,7 @@ class EngineRuntimeChatResult {
     required this.message,
     required this.stage,
     this.generatedText,
+    this.reasoningText,
     this.activeModelProfileId,
     required this.accepted,
     required this.modelStarted,
@@ -171,6 +173,12 @@ class EngineRuntimeChatResult {
       generatedText: _asNullableString(
         data['generated_text'] ?? data['assistant_message'] ?? data['response'],
       ),
+      reasoningText: _asNullableString(
+        data['reasoning_text'] ??
+            data['reasoning_content'] ??
+            runtime['reasoning_text'] ??
+            runtime['reasoning_content'],
+      ),
       activeModelProfileId: _asNullableString(
         data['active_model_profile_id'] ?? runtime['active_model_profile_id'],
       ),
@@ -244,7 +252,9 @@ class EngineRuntimeChatResult {
 class EngineRuntimeStreamChunk {
   final String event;
   final String? delta;
+  final String? reasoningDelta;
   final String? finalText;
+  final String? finalReasoningText;
   final String message;
   final String stage;
   final String? activeModelProfileId;
@@ -260,7 +270,9 @@ class EngineRuntimeStreamChunk {
   const EngineRuntimeStreamChunk({
     required this.event,
     this.delta,
+    this.reasoningDelta,
     this.finalText,
+    this.finalReasoningText,
     required this.message,
     required this.stage,
     this.activeModelProfileId,
@@ -275,16 +287,24 @@ class EngineRuntimeStreamChunk {
   });
 
   bool get isToken => event == 'token' && delta != null && delta!.isNotEmpty;
+  bool get isReasoningToken =>
+      event == 'reasoning_token' &&
+      reasoningDelta != null &&
+      reasoningDelta!.isNotEmpty;
   bool get isDone => event == 'done';
   bool get isError => event == 'error';
 
-  EngineRuntimeChatResult toResult({String? streamedText}) {
+  EngineRuntimeChatResult toResult({
+    String? streamedText,
+    String? streamedReasoningText,
+  }) {
     return EngineRuntimeChatResult(
       ok: accepted && stage != 'error' && !isError,
       accepted: accepted,
       message: message,
       stage: stage,
       generatedText: finalText ?? streamedText,
+      reasoningText: finalReasoningText ?? streamedReasoningText,
       activeModelProfileId: activeModelProfileId,
       modelStarted: modelStarted,
       modelStoppedAfterResponse: modelStoppedAfterResponse,
@@ -304,8 +324,16 @@ class EngineRuntimeStreamChunk {
     return EngineRuntimeStreamChunk(
       event: event,
       delta: _asNullableString(data['delta']),
+      reasoningDelta: _asNullableString(
+        data['reasoning_delta'] ?? data['reasoning_content'],
+      ),
       finalText: _asNullableString(
         data['generated_text'] ?? data['final_text'] ?? data['response'],
+      ),
+      finalReasoningText: _asNullableString(
+        data['reasoning_text'] ??
+            data['final_reasoning_text'] ??
+            data['reasoning_content'],
       ),
       message: response.message,
       stage: response.stage,
@@ -825,6 +853,7 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
     required void Function(EngineRuntimeStreamChunk chunk) onChunk,
   }) async {
     final streamedText = StringBuffer();
+    final streamedReasoningText = StringBuffer();
     EngineRuntimeChatResult? finalResult;
     var currentEvent = 'message';
     final dataLines = <String>[];
@@ -848,8 +877,15 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
           streamedText.write(chunk.delta);
         }
 
+        if (chunk.isReasoningToken && chunk.reasoningDelta != null) {
+          streamedReasoningText.write(chunk.reasoningDelta);
+        }
+
         if (chunk.isDone || chunk.isError) {
-          finalResult = chunk.toResult(streamedText: streamedText.toString());
+          finalResult = chunk.toResult(
+            streamedText: streamedText.toString(),
+            streamedReasoningText: streamedReasoningText.toString(),
+          );
         }
       } catch (_) {
         // Ignore malformed SSE lines; the final error handler covers transport failures.
@@ -906,6 +942,7 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
                 : 'انتهى stream بدون رد من الموديل.',
             stage: streamedText.isNotEmpty ? 'completed' : 'error',
             generatedText: streamedText.toString(),
+            reasoningText: streamedReasoningText.toString(),
             modelStarted: false,
             modelStoppedAfterResponse: false,
             modelLoaded: false,
@@ -1005,6 +1042,70 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
       await refreshEngineStatus(silent: true);
       return EngineMemoryMessageResult.failed(_friendlyError(error));
     }
+  }
+
+  Future<EngineProcessResult> deleteMemoryConversation(
+    String conversationId,
+  ) async {
+    final cleanConversationId = conversationId.trim();
+    if (cleanConversationId.isEmpty) {
+      return EngineProcessResult.failed('conversation_id فارغ.');
+    }
+
+    try {
+      final response = await _dio.delete<Map<String, dynamic>>(
+        '/memory/conversations/${Uri.encodeComponent(cleanConversationId)}',
+      );
+
+      await refreshEngineStatus(silent: true);
+      return _memoryDeleteResultFromResponse(response.data);
+    } on DioException catch (error) {
+      final statusCode = error.response?.statusCode ?? 0;
+      if (statusCode == 404 || statusCode == 405) {
+        return _deleteMemoryConversationFallback(cleanConversationId);
+      }
+
+      await refreshEngineStatus(silent: true);
+      return EngineProcessResult.failed(_friendlyError(error));
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineProcessResult.failed(_friendlyError(error));
+    }
+  }
+
+  Future<EngineProcessResult> _deleteMemoryConversationFallback(
+    String conversationId,
+  ) async {
+    try {
+      final response = await _dio.delete<Map<String, dynamic>>(
+        '/memory/conversations',
+        queryParameters: {'conversation_id': conversationId},
+        data: {'conversation_id': conversationId, 'id': conversationId},
+      );
+
+      await refreshEngineStatus(silent: true);
+      return _memoryDeleteResultFromResponse(response.data);
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineProcessResult.failed(_friendlyError(error));
+    }
+  }
+
+  EngineProcessResult _memoryDeleteResultFromResponse(dynamic responseData) {
+    final data = _asMap(responseData);
+    final ok = _asBool(
+      data['ok'] ?? data['deleted'] ?? data['success'],
+      fallback: true,
+    );
+
+    final message = _asString(
+      data['message'] ?? data['error'],
+      fallback: ok ? 'تم مسح المحادثة.' : 'فشل مسح المحادثة.',
+    );
+
+    return ok
+        ? EngineProcessResult.ok(message)
+        : EngineProcessResult.failed(message);
   }
 
   Future<EngineWorkspaceSessionResult> createMemoryWorkspaceSession({
