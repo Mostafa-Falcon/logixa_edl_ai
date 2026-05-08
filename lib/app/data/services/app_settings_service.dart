@@ -4,14 +4,7 @@ import 'package:get_storage/get_storage.dart';
 import '../models/model_profile_model.dart';
 
 class AppSettingsService extends GetxService {
-  static const String defaultSystemPrompt =
-      '''أنت Logixa EDL AI، مساعد محلي داخل بيئة تطوير وتحكم ذكية.
-
-التزم بالآتي:
-- ساعد المستخدم بوضوح وبأسلوب عربي مصري بسيط عند الحاجة.
-- لا تغيّر الملفات أو تشغّل أدوات إلا بناءً على طلب واضح.
-- احترم سياسة تشغيل الموديل المحلي: لا يعمل إلا عند إرسال رسالة، ولا يبقى محمّلًا إلا لو المستخدم فعّل ذلك.
-- عند تنفيذ مهام تقنية، التزم بالخطوات والملفات المحددة.''';
+  static const String defaultSystemPrompt = '';
 
   static const String _localModelEnabledKey = 'local_model_enabled';
   static const String _activeModelProfileKey = 'active_model_profile';
@@ -26,7 +19,7 @@ class AppSettingsService extends GetxService {
   final localModelEnabled = true.obs;
   final autoStartOnMessage = true.obs;
   final allowBackgroundModel = false.obs;
-  final systemPrompt = defaultSystemPrompt.obs;
+  final systemPrompt = ''.obs;
   final activeModelProfile = ModelProfileModel.defaultLocal().obs;
   final modelProfiles = <ModelProfileModel>[].obs;
 
@@ -104,13 +97,13 @@ class AppSettingsService extends GetxService {
   }
 
   Future<void> resetSystemPrompt() async {
-    systemPrompt.value = defaultSystemPrompt;
-    await _storage.write(_systemPromptKey, defaultSystemPrompt);
+    systemPrompt.value = '';
+    await _storage.write(_systemPromptKey, '');
   }
 
   String _readSystemPrompt(dynamic value) {
     if (value is String && value.trim().isNotEmpty) return value.trim();
-    return defaultSystemPrompt;
+    return '';
   }
 
   Future<void> addModelProfile(ModelProfileModel profile) async {

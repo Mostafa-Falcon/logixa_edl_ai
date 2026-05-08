@@ -172,15 +172,16 @@ impl RuntimeManager {
             return self.reject_for_profile(profile.id.clone(), message).await;
         }
 
-        let system_prompt = payload
-            .system_prompt
+        let system_prompt = resolve_system_prompt(config, payload.system_prompt);
+        let system_prompt_chars = system_prompt
             .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(ToOwned::to_owned)
-            .unwrap_or_else(|| config.system_prompt.trim().to_string());
-        let system_prompt_preview = preview_text(&system_prompt, 160);
-        let system_prompt_chars = system_prompt.chars().count();
+            .map(|value| value.chars().count())
+            .unwrap_or_default();
+        let system_prompt_preview = system_prompt
+            .as_deref()
+            .map(|value| preview_text(value, 160))
+            .filter(|value| !value.is_empty());
+        let system_prompt_applied = system_prompt_chars > 0;
 
         self.update_state(|state| {
             state.stage = RuntimeStage::Starting;
@@ -191,7 +192,7 @@ impl RuntimeManager {
             state.last_error = None;
             state.last_request_epoch_seconds = Some(now_epoch_seconds());
             state.last_system_prompt_chars = system_prompt_chars;
-            state.last_system_prompt_preview = Some(system_prompt_preview.clone());
+            state.last_system_prompt_preview = system_prompt_preview.clone();
             state.server_url = Some(self.server_url.clone());
         })
         .await;
@@ -203,8 +204,9 @@ impl RuntimeManager {
                     .fail(
                         profile.id.clone(),
                         message,
+                        system_prompt_applied,
                         system_prompt_chars,
-                        system_prompt_preview,
+                        system_prompt_preview.clone(),
                     )
                     .await
             }
@@ -219,7 +221,7 @@ impl RuntimeManager {
         .await;
 
         let generated_text = match self
-            .send_chat_completion(&profile, &system_prompt, &prompt)
+            .send_chat_completion(&profile, system_prompt.as_deref(), &prompt)
             .await
         {
             Ok(text) => text,
@@ -228,8 +230,9 @@ impl RuntimeManager {
                     .fail(
                         profile.id.clone(),
                         message,
+                        system_prompt_applied,
                         system_prompt_chars,
-                        system_prompt_preview,
+                        system_prompt_preview.clone(),
                     )
                     .await
             }
@@ -269,9 +272,9 @@ impl RuntimeManager {
             } else {
                 "llama-server response completed and runtime kept loaded".to_string()
             },
-            system_prompt_applied: true,
+            system_prompt_applied,
             system_prompt_chars,
-            system_prompt_preview: Some(system_prompt_preview),
+            system_prompt_preview,
             server_url: Some(self.server_url.clone()),
         }
     }
@@ -362,19 +365,22 @@ impl RuntimeManager {
     async fn send_chat_completion(
         &self,
         profile: &ModelProfileConfig,
-        system_prompt: &str,
+        system_prompt: Option<&str>,
         user_prompt: &str,
     ) -> Result<String, String> {
+        let mut messages = Vec::new();
+        if let Some(system_prompt) = system_prompt {
+            messages.push(json!({"role": "system", "content": system_prompt}));
+        }
+        messages.push(json!({"role": "user", "content": user_prompt}));
+
         let body = json!({
             "model": profile.id,
             "stream": false,
             "max_tokens": profile.max_tokens,
             "temperature": profile.temperature,
             "top_p": profile.top_p,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+            "messages": messages
         });
 
         let response = self
@@ -417,6 +423,8 @@ impl RuntimeManager {
                 state.last_event = Some("runtime_request_rejected".to_string());
                 state.last_error = Some(message.clone());
                 state.last_request_epoch_seconds = Some(now_epoch_seconds());
+                state.last_system_prompt_chars = 0;
+                state.last_system_prompt_preview = None;
             })
             .await;
 
@@ -445,6 +453,8 @@ impl RuntimeManager {
                 state.last_event = Some("runtime_request_rejected".to_string());
                 state.last_error = Some(message.clone());
                 state.last_request_epoch_seconds = Some(now_epoch_seconds());
+                state.last_system_prompt_chars = 0;
+                state.last_system_prompt_preview = None;
                 state.server_url = Some(self.server_url.clone());
             })
             .await;
@@ -469,8 +479,9 @@ impl RuntimeManager {
         &self,
         profile_id: String,
         message: String,
+        system_prompt_applied: bool,
         system_prompt_chars: usize,
-        system_prompt_preview: String,
+        system_prompt_preview: Option<String>,
     ) -> RuntimeChatResponse {
         let _ = self.stop_llama_server().await;
         let snapshot = self
@@ -493,9 +504,9 @@ impl RuntimeManager {
             active_model_profile_id: snapshot.active_model_profile_id,
             generated_text: None,
             message,
-            system_prompt_applied: true,
+            system_prompt_applied,
             system_prompt_chars,
-            system_prompt_preview: Some(system_prompt_preview),
+            system_prompt_preview,
             server_url: Some(self.server_url.clone()),
         }
     }
@@ -508,6 +519,22 @@ impl RuntimeManager {
         update(&mut state);
         state.clone()
     }
+}
+
+fn resolve_system_prompt(config: &EngineConfig, override_prompt: Option<String>) -> Option<String> {
+    override_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            let value = config.system_prompt.trim();
+            if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            }
+        })
 }
 
 fn spawn_llama_server(profile: &ModelProfileConfig) -> std::io::Result<Child> {

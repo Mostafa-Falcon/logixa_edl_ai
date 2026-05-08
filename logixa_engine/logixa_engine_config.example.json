@@ -4,7 +4,7 @@
   "local_model_enabled": false,
   "active_model_profile_id": null,
   "active_model_profile": null,
-  "system_prompt": "أنت Logixa EDL AI، مساعد محلي داخل بيئة تطوير وتحكم ذكية.",
+  "system_prompt": "",
   "auto_start_on_message": true,
   "keep_model_loaded": false,
   "unload_after_response": true,

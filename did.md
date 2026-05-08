@@ -2526,3 +2526,124 @@ curl -i -X POST http://127.0.0.1:8787/runtime/chat \
 
 ### الخطوة التالية
 بعد تثبيت أو تحديد مسار `llama-server`، يتم اختبار inference فعلي على موديل 4B فقط، ثم اعتماد Step 22 commit/tag.
+
+## Step 23 Fix — System Prompt Source Control
+
+### الهدف
+إيقاف أي System Prompt افتراضي أو مخفي، والتأكد أن الـ System Prompt لا يطبق إلا إذا كان المستخدم حفظه صراحة من Flutter Settings أو أرسله صراحة في طلب runtime.
+
+### ما تم تغييره
+- جعل `defaultSystemPrompt` في Flutter فارغًا بدل نص افتراضي ثابت.
+- جعل `resetSystemPrompt()` يمسح القيمة بدل إرجاع نص افتراضي.
+- جعل قراءة System Prompt الفارغ ترجع قيمة فارغة وليس default.
+- تعديل Rust Runtime بحيث لا يضيف رسالة `system` إلى طلب `llama-server` إذا كان الـ prompt فارغًا.
+- جعل `system_prompt_applied=false` و `system_prompt_chars=0` و `system_prompt_preview=null` عند عدم وجود prompt فعلي.
+- تنظيف snapshot عند رفض الطلبات حتى لا يعرض prompt قديم من طلب سابق.
+
+### الملفات المعدلة
+- `lib/app/data/services/app_settings_service.dart`
+- `logixa_engine/src/runtime.rs`
+- `did.md`
+
+### خارج النطاق
+- لا تغيير في Flutter UI.
+- لا تغيير في Model Profiles.
+- لا تغيير في طريقة تشغيل `llama-server`.
+- لا تغيير في README أو todo.
+
+### الفحوص المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo fmt && cargo check`
+- إعادة تشغيل الـ Engine بعد تطبيق الفكس، ثم اختبار `/runtime/chat` والتأكد أن `system_prompt_applied=false` إذا كان `system_prompt` فارغًا.
+
+### النتيجة المتوقعة
+بعد مسح `system_prompt` وإعادة تشغيل الـ Engine:
+
+```json
+"system_prompt_applied": false,
+"system_prompt_chars": 0,
+"system_prompt_preview": null
+```
+
+## Step 23 Fix — Hidden System Prompt Hardening
+
+### الهدف
+إزالة أي System Prompt ثابت أو مخفي من إعدادات التشغيل، والتأكد أن الـ System Prompt لا يطبق إلا إذا حفظه المستخدم صراحة من الواجهة.
+
+### ما تم تغييره
+- إزالة default system prompt من Flutter settings service.
+- تحديث Rust runtime بحيث لا يرسل role=system إذا كانت قيمة system_prompt فارغة.
+- تصفير بيانات system_prompt في ردود runtime عند عدم وجود prompt فعلي.
+- تحديث logixa_engine_config.example.json ليكون system_prompt فارغًا.
+- تنظيف logixa_engine_config.json المحلي أثناء تطبيق السكريبت:
+  - system_prompt = ""
+  - إزالة {system_prompt} من prompt_template المحلي إن كان موجودًا داخل active_model_profile.
+
+### الملفات المتغيرة
+- lib/app/data/services/app_settings_service.dart
+- logixa_engine/src/runtime.rs
+- logixa_engine/logixa_engine_config.example.json
+- did.md
+
+### خارج النطاق
+- لا تعديل README.md.
+- لا تعديل todo.md.
+- لا تغيير في موديل GGUF.
+- لا تغيير في llama-server.
+- لا إضافة System Prompt بديل.
+
+### الاختبارات المطلوبة
+- flutter analyze
+- cd logixa_engine && cargo fmt && cargo check
+- إيقاف أي process قديم على port 8787 ثم تشغيل cargo run من جديد.
+- اختبار /runtime/chat والتأكد أن system_prompt_applied=false عندما يكون system_prompt فارغًا.
+
+## Step 23 Fix — Hidden System Prompt Hardening
+
+### الهدف
+إزالة أي System Prompt ثابت أو مخفي من إعدادات التشغيل، والتأكد أن الـ System Prompt لا يطبق إلا إذا حفظه المستخدم صراحة من الواجهة.
+
+### ما تم تغييره
+- إزالة default system prompt من Flutter settings service.
+- تحديث Rust runtime بحيث لا يرسل role=system إذا كانت قيمة system_prompt فارغة.
+- تصفير بيانات system_prompt في ردود runtime عند عدم وجود prompt فعلي.
+- تحديث logixa_engine_config.example.json ليكون system_prompt فارغًا.
+- تنظيف logixa_engine_config.json المحلي أثناء تطبيق السكريبت:
+  - system_prompt = ""
+  - إزالة {system_prompt} من prompt_template المحلي إن كان موجودًا داخل active_model_profile.
+
+### الملفات المتغيرة
+- lib/app/data/services/app_settings_service.dart
+- logixa_engine/src/runtime.rs
+- logixa_engine/logixa_engine_config.example.json
+- did.md
+
+### خارج النطاق
+- لا تعديل README.md.
+- لا تعديل todo.md.
+- لا تغيير في موديل GGUF.
+- لا تغيير في llama-server.
+- لا إضافة System Prompt بديل.
+
+### الاختبارات المطلوبة
+- flutter analyze
+- cd logixa_engine && cargo fmt && cargo check
+- إيقاف أي process قديم على port 8787 ثم تشغيل cargo run من جديد.
+- اختبار /runtime/chat والتأكد أن system_prompt_applied=false عندما يكون system_prompt فارغًا.
+
+## Step 23 Fix — Remove hidden Rust default system prompt
+
+### الهدف
+إزالة أي System Prompt ثابت/مخفي من مصدر إعدادات Rust وملفات JSON، بحيث لا يطبق المحرك أي System Prompt إلا إذا حفظه المستخدم صراحة من واجهة Flutter.
+
+### ما تغير
+- تفريغ مصدر الـ default system prompt في `logixa_engine/src/config.rs`.
+- تفريغ `system_prompt` في `logixa_engine_config.example.json` و `logixa_engine_config.json`.
+- تنظيف أي default قديم متبقٍ في `AppSettingsService` إن وجد.
+
+### الاختبارات المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo fmt && cargo check`
+- إيقاف أي Engine قديم على port 8787 ثم تشغيل `cargo run` من جديد.
+- اختبار `/runtime/chat` والتأكد أن `system_prompt_applied=false` عندما يكون prompt فارغًا.
+
