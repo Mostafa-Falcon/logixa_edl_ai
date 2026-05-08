@@ -2310,3 +2310,219 @@ flutter run -d linux
 
 ### الحالة
 بانتظار فحص مصطفى ونتيجة `flutter analyze` قبل اعتماد Step 20.
+
+---
+
+## Step 21 — Runtime GGUF Adapter Planning
+
+### الهدف
+تثبيت قرار تشغيل GGUF الحقيقي قبل كتابة كود التشغيل، وتحديد حدود Step 22 بشكل آمن وقابل للاختبار.
+
+### ما تم تنفيذه
+- إضافة وثيقة تخطيط مستقلة:
+  - `docs/runtime_gguf_adapter_plan.md`
+- تثبيت القرار التنفيذي:
+  - استخدام `llama.cpp` process manager داخل Rust Engine.
+  - البدء بـ non-streaming.
+  - تشغيل الموديل on-demand فقط.
+  - `unload_after_response = true` كافتراضي.
+  - البدء بموديل Gemma 3 4B فقط.
+  - تأجيل 12B لحد ما 4B يثبت بدون freeze أو ضغط RAM.
+- تحديد شكل Adapter المقترح داخل Rust.
+- تحديد الإعدادات المطلوبة قبل Step 22.
+- تثبيت سياسة عدم وجود hardcoded model paths.
+- تحديد Prompt Template policy لـ Gemma.
+- تحديد runtime states والأخطاء المطلوبة.
+- تحديد حدود Step 22 بوضوح.
+
+### الملفات المضافة
+- `docs/runtime_gguf_adapter_plan.md`
+
+### الملفات المعدلة
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تشغيل GGUF.
+- لم يتم تعديل Rust Engine.
+- لم يتم تعديل Flutter UI.
+- لم يتم إضافة Packages.
+- لم يتم تشغيل 12B.
+- لم يتم إضافة streaming.
+
+### الفحص المطلوب
+```bash
+flutter analyze
+git status --short
+```
+
+### الحالة
+بانتظار مراجعة مصطفى واعتماد Step 21 قبل تنفيذ Step 22.
+
+---
+
+## Step 22 — Rust-managed llama-server GGUF Adapter
+
+### الهدف
+تنفيذ أول ربط حقيقي لتشغيل GGUF من Rust Engine، باستخدام `llama-server` كـ primary adapter بدل `llama-cli`، مع الحفاظ على Flutter كواجهة تحكم فقط.
+
+### مراجعة قبل التنفيذ
+- تم الالتزام بقرار التشغيل:
+  - Primary: `llama-server` managed by Rust.
+  - Fallback/debug: `llama-cli` فقط لاحقًا عند الحاجة.
+  - Future: direct `llama.cpp` C API بعد الاستقرار.
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم إضافة UI جديدة.
+- لم يتم تشغيل 12B.
+- لم يتم إضافة streaming.
+
+### ما تم تنفيذه
+- استبدال mock lifecycle داخل `logixa_engine/src/runtime.rs` بتشغيل حقيقي مبدئي عبر `llama-server`.
+- `RuntimeManager` أصبح يدير child process محلي لـ `llama-server`.
+- قراءة مسار GGUF من `active_model_profile.model_path` فقط.
+- رفض التشغيل عند:
+  - `local_model_enabled = false`
+  - `auto_start_on_message = false`
+  - prompt فاضي
+  - عدم وجود active model profile
+  - عدم وجود model path
+  - model path غير موجود على الجهاز
+- تشغيل `llama-server` على `127.0.0.1:8788` افتراضيًا.
+- إضافة دعم متغيرات البيئة:
+  - `LOGIXA_LLAMA_SERVER_BIN`
+  - `LOGIXA_LLAMA_SERVER_PORT`
+  - `LOGIXA_LLAMA_SERVER_URL`
+- استدعاء endpoint:
+  - `POST /v1/chat/completions`
+- أول تنفيذ non-streaming فقط.
+- احترام policy:
+  - `unload_after_response = true`
+  - `keep_model_loaded = false`
+- تحديث Runtime stages إلى حالات أوضح:
+  - idle
+  - starting
+  - ready
+  - generating
+  - stopping
+  - stopped
+  - completed
+  - error
+- إضافة `reqwest` للاتصال الداخلي مع `llama-server`.
+- تحديث خطة `docs/runtime_gguf_adapter_plan.md` لتثبيت قرار `llama-server`.
+
+### الملفات التي تم تعديلها
+- `logixa_engine/Cargo.toml`
+- `logixa_engine/src/runtime.rs`
+- `docs/runtime_gguf_adapter_plan.md`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل Flutter UI.
+- لم يتم إضافة streaming.
+- لم يتم تشغيل 12B.
+- لم يتم استخدام `llama-cli` كمسار أساسي.
+- لم يتم إدخال direct C API.
+- لم يتم إضافة auto-save لرسائل `/runtime/chat` داخل الذاكرة؛ هذا مؤجل لخطوة منفصلة بعد ثبات inference.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+### اختبار يدوي مقترح
+```bash
+curl -s -X POST http://127.0.0.1:8787/runtime/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"رد بجملة قصيرة: النظام شغال؟"}' | python3 -m json.tool
+```
+
+لو `llama-server` ليس في PATH:
+```bash
+export LOGIXA_LLAMA_SERVER_BIN="/path/to/llama-server"
+```
+
+### الخطوة التالية
+Step 23 يجب أن تكون تثبيت/تنظيف حسب نتيجة اختبار Step 22:
+- لو التشغيل نجح: نربط Chat UI بالرد الحقيقي أو نحفظ الرسائل في Memory.
+- لو التشغيل فشل: نصلح مسار `llama-server` أو arguments أو endpoint بدون توسيع السكوب.
+
+---
+
+## Step 22 Fix — User-selected GGUF Path + llama-server Maintenance Guard
+
+### الهدف
+إصلاح Step 22 قبل اعتمادها حتى لا يعتمد تشغيل GGUF على أي مسار موديل ثابت أو preset قديم داخل الكود، ويصبح مسار الموديل مسؤولية المستخدم من Flutter Settings فقط.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` كمرجع أعلى.
+- تمت مراجعة `did.md` قبل التنفيذ.
+- تمت مراجعة `todo.md` قبل التنفيذ.
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- هذا Fix داخل Step 22 وليس Step جديدة.
+
+### ما تم تنفيذه
+- إزالة مسارات Gemma GGUF الثابتة من presets داخل Flutter model profile.
+- جعل presets تنشئ بروفايل إعدادات فقط بدون `model_path`.
+- تنظيف أي مسارات preset قديمة مخزنة مثل:
+  - `models/gemma3_abliterated_v2/gemma-3-4b-it-abliterated-v2.q4_k_m.gguf`
+  - `models/gemma3_abliterated_v2/gemma-3-12b-it-abliterated-v2.q4_k_m.gguf`
+- إلزام Rust Runtime بأن يكون `model_path` مسارًا مطلقًا absolute path، حتى يأتي من اختيار المستخدم في Flutter File Picker أو إدخال واضح.
+- منع تشغيل 12B مؤقتًا في Step 22 حسب قرار الخطة: 4B أولًا فقط.
+- إضافة فحص واضح لـ `llama-server` قبل محاولة التشغيل.
+- إذا كان `llama-server` غير موجود في PATH أو `LOGIXA_LLAMA_SERVER_BIN` غير مضبوط، يرجع Runtime رسالة maintenance واضحة بدل فشل مبهم:
+  - `llama_server_bin_not_found: runtime_in_maintenance_until_llama_server_is_installed_or_LOGIXA_LLAMA_SERVER_BIN_is_configured`
+- الحفاظ على عدم تشغيل أي أوامر تلقائية.
+- الحفاظ على non-streaming فقط.
+- الحفاظ على Rust-managed llama-server adapter بدون Flutter UI جديدة.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/models/model_profile_model.dart`
+- `lib/app/data/services/app_settings_service.dart`
+- `logixa_engine/src/runtime.rs`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تثبيت `llama-server`.
+- لم يتم تعديل Rust schema خارج Runtime guard.
+- لم يتم تشغيل inference حقيقي بعد.
+- لم يتم إضافة UI جديدة.
+- لم يتم تغيير README أو todo.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+وفي Terminal آخر:
+
+```bash
+curl -i -X POST http://127.0.0.1:8787/runtime/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"رد بجملة قصيرة: النظام شغال؟"}'
+```
+
+### النتيجة المتوقعة قبل تثبيت llama-server
+- لو لم يتم اختيار موديل من Flutter:
+  - `missing_model_path`
+- لو المسار نسبي أو preset قديم:
+  - `model_path_must_be_absolute`
+- لو تم اختيار 12B:
+  - `model_temporarily_blocked_12b_use_4b_first`
+- لو تم اختيار 4B صحيح لكن `llama-server` غير موجود:
+  - `llama_server_bin_not_found: runtime_in_maintenance_until_llama_server_is_installed_or_LOGIXA_LLAMA_SERVER_BIN_is_configured`
+
+### الخطوة التالية
+بعد تثبيت أو تحديد مسار `llama-server`، يتم اختبار inference فعلي على موديل 4B فقط، ثم اعتماد Step 22 commit/tag.

@@ -4,7 +4,8 @@ import 'package:get_storage/get_storage.dart';
 import '../models/model_profile_model.dart';
 
 class AppSettingsService extends GetxService {
-  static const String defaultSystemPrompt = '''أنت Logixa EDL AI، مساعد محلي داخل بيئة تطوير وتحكم ذكية.
+  static const String defaultSystemPrompt =
+      '''أنت Logixa EDL AI، مساعد محلي داخل بيئة تطوير وتحكم ذكية.
 
 التزم بالآتي:
 - ساعد المستخدم بوضوح وبأسلوب عربي مصري بسيط عند الحاجة.
@@ -38,7 +39,8 @@ class AppSettingsService extends GetxService {
   void _loadSettings() {
     localModelEnabled.value = _storage.read(_localModelEnabledKey) ?? true;
     autoStartOnMessage.value = _storage.read(_autoStartOnMessageKey) ?? true;
-    allowBackgroundModel.value = _storage.read(_allowBackgroundModelKey) ?? false;
+    allowBackgroundModel.value =
+        _storage.read(_allowBackgroundModelKey) ?? false;
     systemPrompt.value = _readSystemPrompt(_storage.read(_systemPromptKey));
 
     final profiles = _readStoredProfiles();
@@ -56,7 +58,11 @@ class AppSettingsService extends GetxService {
     if (storedProfiles is List) {
       final profiles = storedProfiles
           .whereType<Map>()
-          .map((item) => ModelProfileModel.fromJson(Map<String, dynamic>.from(item)))
+          .map(
+            (item) => _sanitizeLegacyModelPath(
+              ModelProfileModel.fromJson(Map<String, dynamic>.from(item)),
+            ),
+          )
           .toList();
 
       if (profiles.isNotEmpty) return profiles;
@@ -65,8 +71,10 @@ class AppSettingsService extends GetxService {
     final legacyProfile = _storage.read(_activeModelProfileKey);
     if (legacyProfile is Map) {
       return [
-        ModelProfileModel.fromJson(Map<String, dynamic>.from(legacyProfile)).copyWith(
-          isActive: true,
+        _sanitizeLegacyModelPath(
+          ModelProfileModel.fromJson(
+            Map<String, dynamic>.from(legacyProfile),
+          ).copyWith(isActive: true),
         ),
       ];
     }
@@ -88,7 +96,6 @@ class AppSettingsService extends GetxService {
     allowBackgroundModel.value = value;
     await _storage.write(_allowBackgroundModelKey, value);
   }
-
 
   Future<void> setSystemPrompt(String value) async {
     final normalized = _readSystemPrompt(value);
@@ -129,9 +136,13 @@ class AppSettingsService extends GetxService {
 
   Future<void> saveActiveModelProfile(ModelProfileModel profile) async {
     final activeProfile = profile.copyWith(isActive: true);
-    final existingIndex = modelProfiles.indexWhere((item) => item.id == activeProfile.id);
+    final existingIndex = modelProfiles.indexWhere(
+      (item) => item.id == activeProfile.id,
+    );
 
-    final nextProfiles = modelProfiles.map((item) => item.copyWith(isActive: false)).toList();
+    final nextProfiles = modelProfiles
+        .map((item) => item.copyWith(isActive: false))
+        .toList();
 
     if (existingIndex == -1) {
       nextProfiles.add(activeProfile);
@@ -149,8 +160,12 @@ class AppSettingsService extends GetxService {
   Future<bool> deleteModelProfile(String profileId) async {
     if (modelProfiles.length <= 1) return false;
 
-    final nextProfiles = modelProfiles.where((item) => item.id != profileId).toList();
-    final activeId = activeModelProfile.value.id == profileId ? nextProfiles.first.id : activeModelProfile.value.id;
+    final nextProfiles = modelProfiles
+        .where((item) => item.id != profileId)
+        .toList();
+    final activeId = activeModelProfile.value.id == profileId
+        ? nextProfiles.first.id
+        : activeModelProfile.value.id;
 
     await _setProfilesState(
       profiles: nextProfiles,
@@ -170,7 +185,10 @@ class AppSettingsService extends GetxService {
     final resolvedActiveId = _resolveActiveId(sanitizedProfiles, activeId);
 
     final nextProfiles = sanitizedProfiles
-        .map((profile) => profile.copyWith(isActive: profile.id == resolvedActiveId))
+        .map(
+          (profile) =>
+              profile.copyWith(isActive: profile.id == resolvedActiveId),
+        )
         .toList(growable: false);
 
     modelProfiles.assignAll(nextProfiles);
@@ -188,18 +206,24 @@ class AppSettingsService extends GetxService {
     final uniqueProfiles = <String, ModelProfileModel>{};
 
     for (final profile in profiles) {
-      uniqueProfiles[profile.id] = profile;
+      final safeProfile = _sanitizeLegacyModelPath(profile);
+      uniqueProfiles[safeProfile.id] = safeProfile;
     }
 
     if (uniqueProfiles.isEmpty) {
-      uniqueProfiles[ModelProfileModel.defaultLocal().id] = ModelProfileModel.defaultLocal();
+      uniqueProfiles[ModelProfileModel.defaultLocal().id] =
+          ModelProfileModel.defaultLocal();
     }
 
     return uniqueProfiles.values.toList(growable: false);
   }
 
-  String _resolveActiveId(List<ModelProfileModel> profiles, String? preferredId) {
-    if (preferredId != null && profiles.any((profile) => profile.id == preferredId)) {
+  String _resolveActiveId(
+    List<ModelProfileModel> profiles,
+    String? preferredId,
+  ) {
+    if (preferredId != null &&
+        profiles.any((profile) => profile.id == preferredId)) {
       return preferredId;
     }
 
@@ -209,11 +233,34 @@ class AppSettingsService extends GetxService {
     return profiles.first.id;
   }
 
+  ModelProfileModel _sanitizeLegacyModelPath(ModelProfileModel profile) {
+    final trimmedPath = profile.modelPath.trim();
+    if (trimmedPath.isEmpty) return profile.copyWith(modelPath: '');
+
+    final normalizedPath = trimmedPath.replaceAll('\\', '/');
+    final isOldBundledPresetPath =
+        normalizedPath ==
+            'models/gemma3_abliterated_v2/gemma-3-4b-it-abliterated-v2.q4_k_m.gguf' ||
+        normalizedPath ==
+            'models/gemma3_abliterated_v2/gemma-3-12b-it-abliterated-v2.q4_k_m.gguf';
+
+    if (isOldBundledPresetPath) {
+      return profile.copyWith(modelPath: '');
+    }
+
+    return profile.copyWith(modelPath: trimmedPath);
+  }
+
   Future<void> _persistProfiles() async {
-    final profilesJson = modelProfiles.map((profile) => profile.toJson()).toList(growable: false);
+    final profilesJson = modelProfiles
+        .map((profile) => profile.toJson())
+        .toList(growable: false);
 
     await _storage.write(_modelProfilesKey, profilesJson);
     await _storage.write(_activeModelProfileIdKey, activeModelProfile.value.id);
-    await _storage.write(_activeModelProfileKey, activeModelProfile.value.toJson());
+    await _storage.write(
+      _activeModelProfileKey,
+      activeModelProfile.value.toJson(),
+    );
   }
 }
