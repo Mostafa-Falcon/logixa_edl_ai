@@ -392,4 +392,41 @@ class AppStrings {
   static const String workspaceLogsEmpty = 'لا توجد لوجات لمساحة العمل بعد.';
   static const String workspaceProblemsEmpty = 'لا توجد مشاكل مرصودة حاليًا.';
   static const String workspaceOutputSummary = 'ملخص مساحة العمل';
+
+  // Runtime model router
+  static const String runtimeRouterTitle = 'موجّه الموديل اليدوي';
+  static const String runtimeRouterDescription =
+      'اختار يدويًا بين Fast و Quality. الاختيار يغيّر البروفايل النشط فقط، بدون مسارات ثابتة وبدون تحميل موديلين معًا.';
+  static const String runtimeRouterGuardNote =
+      'ملاحظة: Fast/Quality بيعتمدوا على البروفايلات اللي أنت عاملها وحافظ مساراتها من Settings. لو مفيش بروفايل مناسب، الاختيار هيتوقف برسالة واضحة.';
+  static const String runtimeRouterFastTitle = 'Fast / 4B';
+  static const String runtimeRouterFastDescription =
+      'الوضع السريع للمحادثة اليومية والاختبارات الخفيفة. يختار أول بروفايل role=fast أو يحتوي 4B.';
+  static const String runtimeRouterQualityTitle = 'Quality / 12B';
+  static const String runtimeRouterQualityDescription =
+      'وضع الجودة الأعلى للتجارب الأثقل. يختار أول بروفايل role=quality أو يحتوي 12B.';
+  static const String runtimeRouterFastActiveBadge = 'Fast نشط';
+  static const String runtimeRouterQualityActiveBadge = 'Quality نشط';
+  static const String runtimeRouterActiveLabel = 'نشط';
+  static const String runtimeRouterAvailableLabel = 'جاهز';
+  static const String runtimeRouterMissingLabel = 'غير مضبوط';
+  static const String runtimeRouterSelectButton = 'اختيار الوضع';
+  static const String runtimeRouterCurrentButton = 'الوضع الحالي';
+  static const String runtimeRouterLinkedProfilePrefix = 'البروفايل:';
+  static const String runtimeRouterFastMissingShort = 'لا يوجد بروفايل Fast';
+  static const String runtimeRouterQualityMissingShort =
+      'لا يوجد بروفايل Quality';
+  static const String runtimeRouterFastMissing =
+      'لا يوجد بروفايل Fast صالح. اعمل بروفايل 4B أو اضبط model_role = fast واحفظ مسار GGUF.';
+  static const String runtimeRouterQualityMissing =
+      'لا يوجد بروفايل Quality صالح. اعمل بروفايل 12B أو اضبط model_role = quality واحفظ مسار GGUF.';
+  static const String runtimeRouterFastAlreadyActive = 'وضع Fast نشط بالفعل.';
+  static const String runtimeRouterQualityAlreadyActive =
+      'وضع Quality نشط بالفعل.';
+  static const String runtimeRouterFastSynced =
+      'تم اختيار وضع Fast ومزامنة البروفايل مع Rust Engine.';
+  static const String runtimeRouterQualitySynced =
+      'تم اختيار وضع Quality ومزامنة البروفايل مع Rust Engine.';
+  static const String runtimeRouterSavedLocallyOnly =
+      'تم اختيار وضع الموديل محليًا، لكن Rust Engine غير متصل للمزامنة.';
 }

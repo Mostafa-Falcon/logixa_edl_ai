@@ -2889,3 +2889,35 @@ flutter run -d linux
 
 ### التالي
 بعد نجاح الفحص، يتم عمل commit للفكس فقط، ثم نكمل Step 24 الرسمية الخاصة بـ Runtime Model Router.
+
+
+## Step 24 — Manual Runtime Model Router 4B/12B
+
+### الهدف
+تنفيذ الجزء الرسمي من Step 24 كـ Manual Router فقط بين Fast / Quality، بدون Auto Router، وبدون أي مسارات موديل ثابتة، وبدون تحميل 4B و12B معًا.
+
+### ما تم
+- إضافة قسم `RuntimeModelRouterSection` داخل Settings.
+- إضافة اختيارين واضحين: `Fast / 4B` و `Quality / 12B`.
+- اختيار الوضع يختار بروفايل موجود من إعدادات المستخدم بناءً على `model_role` أو دلالة 4B/12B في اسم/مسار البروفايل.
+- حفظ البروفايل المختار كبروفايل نشط ومزامنته مع Rust Engine.
+- فرض `keepModelLoaded=false` و `unloadAfterResponse=true` عند التبديل لتجنب إبقاء موديلين محملين.
+- عدم إضافة أي System Prompt افتراضي.
+- عدم إضافة أي Auto Router.
+- عدم إضافة أي مسار GGUF ثابت.
+
+### الملفات المتغيرة
+- `did.md`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/settings/controllers/settings_controller.dart`
+- `lib/app/modules/settings/views/sections/local_model_settings_section.dart`
+- `lib/app/modules/settings/views/sections/runtime_model_router_section.dart`
+
+### الفحوصات المطلوبة
+- `flutter analyze`
+- اختبار يدوي لاختيار Fast ثم Quality من Settings.
+- التأكد أن البروفايل النشط يتغير ويتزامن مع Rust Engine.
+
+### المؤجل
+- Auto Router مؤجل.
+- أي routing ذكي حسب طول الطلب أو نوع المهمة مؤجل.

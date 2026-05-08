@@ -323,6 +323,132 @@ class SettingsController extends GetxController {
     }
   }
 
+  static const String runtimeRouterFastMode = 'fast';
+  static const String runtimeRouterQualityMode = 'quality';
+
+  String get activeRuntimeRouterMode {
+    final profile = settingsService.activeModelProfile.value;
+    if (_profileMatchesRouterMode(profile, runtimeRouterQualityMode)) {
+      return runtimeRouterQualityMode;
+    }
+    return runtimeRouterFastMode;
+  }
+
+  bool get hasFastRuntimeProfile {
+    return _findRuntimeRouterProfile(runtimeRouterFastMode) != null;
+  }
+
+  bool get hasQualityRuntimeProfile {
+    return _findRuntimeRouterProfile(runtimeRouterQualityMode) != null;
+  }
+
+  String get fastRuntimeProfileLabel {
+    return _findRuntimeRouterProfile(runtimeRouterFastMode)?.name ??
+        AppStrings.runtimeRouterFastMissingShort;
+  }
+
+  String get qualityRuntimeProfileLabel {
+    return _findRuntimeRouterProfile(runtimeRouterQualityMode)?.name ??
+        AppStrings.runtimeRouterQualityMissingShort;
+  }
+
+  Future<void> selectRuntimeRouterMode(String mode) async {
+    if (isSaving.value) return;
+
+    final normalizedMode = mode.trim().toLowerCase();
+    final targetProfile = _findRuntimeRouterProfile(normalizedMode);
+
+    if (targetProfile == null) {
+      _showError(
+        normalizedMode == runtimeRouterQualityMode
+            ? AppStrings.runtimeRouterQualityMissing
+            : AppStrings.runtimeRouterFastMissing,
+      );
+      return;
+    }
+
+    final current = settingsService.activeModelProfile.value;
+    if (current.id == targetProfile.id) {
+      _showSuccess(
+        normalizedMode == runtimeRouterQualityMode
+            ? AppStrings.runtimeRouterQualityAlreadyActive
+            : AppStrings.runtimeRouterFastAlreadyActive,
+      );
+      return;
+    }
+
+    isSaving.value = true;
+    try {
+      final routedProfile = targetProfile.copyWith(
+        isActive: true,
+        keepModelLoaded: false,
+        unloadAfterResponse: true,
+      );
+
+      await settingsService.saveActiveModelProfile(routedProfile);
+      _syncControllersFromProfile(settingsService.activeModelProfile.value);
+      systemPromptController.text = settingsService.systemPrompt.value;
+
+      final syncResult = await engineClientService.syncRuntimeProfile(
+        profile: settingsService.activeModelProfile.value,
+        localModelEnabled: settingsService.localModelEnabled.value,
+        autoStartOnMessage: settingsService.autoStartOnMessage.value,
+        allowBackgroundModel: settingsService.allowBackgroundModel.value,
+      );
+
+      _showSyncResult(
+        syncResult,
+        normalizedMode == runtimeRouterQualityMode
+            ? AppStrings.runtimeRouterQualitySynced
+            : AppStrings.runtimeRouterFastSynced,
+        AppStrings.runtimeRouterSavedLocallyOnly,
+      );
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  ModelProfileModel? _findRuntimeRouterProfile(String mode) {
+    final normalizedMode = mode.trim().toLowerCase();
+    final profiles = settingsService.modelProfiles.toList(growable: false);
+
+    for (final profile in profiles) {
+      if (profile.modelRole.trim().toLowerCase() == normalizedMode &&
+          profile.modelPath.trim().isNotEmpty) {
+        return profile;
+      }
+    }
+
+    for (final profile in profiles) {
+      if (_profileMatchesRouterMode(profile, normalizedMode) &&
+          profile.modelPath.trim().isNotEmpty) {
+        return profile;
+      }
+    }
+
+    for (final profile in profiles) {
+      if (profile.modelRole.trim().toLowerCase() == normalizedMode) {
+        return profile;
+      }
+    }
+
+    return null;
+  }
+
+  bool _profileMatchesRouterMode(ModelProfileModel profile, String mode) {
+    final normalizedMode = mode.trim().toLowerCase();
+    final role = profile.modelRole.trim().toLowerCase();
+    final name = profile.name.trim().toLowerCase();
+    final modelPath = profile.modelPath.trim().toLowerCase();
+    final combined = '$name $modelPath';
+
+    if (normalizedMode == runtimeRouterQualityMode) {
+      return role == runtimeRouterQualityMode || combined.contains('12b');
+    }
+
+    return role == runtimeRouterFastMode || combined.contains('4b');
+  }
+
   void _syncControllersFromProfile(ModelProfileModel profile) {
     modelNameController.text = profile.name;
     modelPathController.text = profile.modelPath;
