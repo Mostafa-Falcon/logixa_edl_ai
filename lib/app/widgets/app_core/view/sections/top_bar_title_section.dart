@@ -35,10 +35,20 @@ class TopBarTitleSection extends GetView<TopBarController> {
           ),
         ),
         SizedBox(width: AppSizes.md.w),
-        const ReusableStatusBadge(
-          label: AppStrings.systemActive,
-          color: AppColors.info,
-        ),
+        Obx(() {
+          final label = controller.engineStatusLabel;
+          final color = controller.engineStatusColor;
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: AppSizes.normalAnimation),
+            child: ReusableStatusBadge(
+              key: ValueKey(label),
+              label: label,
+              color: color,
+              icon: Icons.router_rounded,
+            ),
+          );
+        }),
       ],
     );
   }

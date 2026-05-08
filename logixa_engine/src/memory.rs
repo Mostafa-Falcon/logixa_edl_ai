@@ -2,7 +2,12 @@ use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{fs, path::PathBuf, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -151,7 +156,9 @@ impl MemoryStore {
             }
         }
 
-        let store = Self { db_path: Arc::new(db_path) };
+        let store = Self {
+            db_path: Arc::new(db_path),
+        };
         store.initialize()?;
         Ok(store)
     }
@@ -241,7 +248,10 @@ impl MemoryStore {
         })
     }
 
-    pub fn create_conversation(&self, request: CreateConversationRequest) -> Result<ConversationRecord> {
+    pub fn create_conversation(
+        &self,
+        request: CreateConversationRequest,
+    ) -> Result<ConversationRecord> {
         let conn = self.open()?;
         let now = now_epoch_seconds();
         let title = normalize_text(request.title.unwrap_or_default(), "محادثة جديدة");
@@ -564,7 +574,8 @@ impl MemoryStore {
     pub fn save_selected_model_profile(&self, profile_id: &str, profile: &Value) -> Result<()> {
         let conn = self.open()?;
         let now = now_epoch_seconds();
-        let profile_json = serde_json::to_string(profile).context("failed to serialize selected model profile")?;
+        let profile_json =
+            serde_json::to_string(profile).context("failed to serialize selected model profile")?;
 
         conn.execute(
             "INSERT INTO selected_model_profile (id, profile_id, profile_json, updated_at)
@@ -603,9 +614,8 @@ impl MemoryStore {
     }
 
     fn open(&self) -> Result<Connection> {
-        Connection::open(self.db_path.as_ref()).with_context(|| {
-            format!("failed to open memory db: {}", self.db_path.display())
-        })
+        Connection::open(self.db_path.as_ref())
+            .with_context(|| format!("failed to open memory db: {}", self.db_path.display()))
     }
 }
 

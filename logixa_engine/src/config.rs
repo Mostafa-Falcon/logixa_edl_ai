@@ -61,12 +61,11 @@ impl EngineConfig {
             })?;
         }
 
-        let pretty = serde_json::to_string_pretty(self)
-            .context("failed to serialize engine config")?;
+        let pretty =
+            serde_json::to_string_pretty(self).context("failed to serialize engine config")?;
 
-        fs::write(config_path, format!("{pretty}\n")).with_context(|| {
-            format!("failed to write config file: {}", config_path.display())
-        })?;
+        fs::write(config_path, format!("{pretty}\n"))
+            .with_context(|| format!("failed to write config file: {}", config_path.display()))?;
 
         Ok(())
     }
@@ -92,7 +91,6 @@ impl EngineConfig {
     }
 }
 
-
 pub fn default_system_prompt() -> String {
     "أنت Logixa EDL AI، مساعد محلي داخل بيئة تطوير وتحكم ذكية.
 
@@ -100,7 +98,8 @@ pub fn default_system_prompt() -> String {
 - ساعد المستخدم بوضوح وبأسلوب عربي مصري بسيط عند الحاجة.
 - لا تغيّر الملفات أو تشغّل أدوات إلا بناءً على طلب واضح.
 - احترم سياسة تشغيل الموديل المحلي: لا يعمل إلا عند إرسال رسالة، ولا يبقى محمّلًا إلا لو المستخدم فعّل ذلك.
-- عند تنفيذ مهام تقنية، التزم بالخطوات والملفات المحددة.".to_string()
+- عند تنفيذ مهام تقنية، التزم بالخطوات والملفات المحددة."
+        .to_string()
 }
 
 pub fn normalize_system_prompt(value: String) -> String {

@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app/constants/app_strings.dart';
 import 'app/data/services/app_settings_service.dart';
+import 'app/data/services/engine_client_service.dart';
 import 'app/routes/app_pages.dart';
 import 'app/theme/app_theme.dart';
 
@@ -14,6 +15,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
   Get.put(AppSettingsService(), permanent: true);
+  Get.put(EngineClientService(), permanent: true);
   await _setupWindow();
 
   runApp(const LogixaEdlAiApp());

@@ -42,6 +42,7 @@ class AppStrings {
   static const String searchTooltip = 'بحث سريع';
   static const String commandsTooltip = 'الأوامر الذكية';
   static const String settingsTooltip = 'الإعدادات';
+  static const String refreshEngineStatusTooltip = 'تحديث حالة Rust Engine';
 
   static const String enableLocalModelTooltip = 'تفعيل وضع الموديل المحلي';
   static const String disableLocalModelTooltip = 'إيقاف وضع الموديل المحلي';
@@ -123,6 +124,25 @@ class AppStrings {
   static const String settingsPageTitle = 'الإعدادات';
   static const String settingsPageSubtitle =
       'تحكم في إعدادات Logixa EDL AI بدون تثبيت قيم داخل الكود.';
+
+  static const String engineStatusTitle = 'حالة Rust Engine';
+  static const String engineStatusDescription =
+      'فحص اتصال Flutter بالمحرك المحلي فقط. هذه الخطوة لا تغيّر إعدادات الموديل ولا تشغّل GGUF.';
+  static const String engineOnline = 'المحرك متصل';
+  static const String engineOffline = 'المحرك غير متصل';
+  static const String engineChecking = 'جاري الفحص';
+  static const String engineRefreshButton = 'تحديث الحالة';
+  static const String engineServiceLabel = 'الخدمة';
+  static const String engineVersionLabel = 'الإصدار';
+  static const String engineRuntimeStageLabel = 'مرحلة التشغيل';
+  static const String engineModelLoadedLabel = 'الموديل محمّل';
+  static const String engineLocalModelEnabledLabel = 'الموديل المحلي مفعّل';
+  static const String engineActiveProfileLabel = 'البروفايل النشط';
+  static const String engineUptimeLabel = 'وقت التشغيل';
+  static const String engineConfigPathLabel = 'ملف الإعدادات';
+  static const String engineMemoryPathLabel = 'قاعدة الذاكرة';
+  static const String engineNoActiveProfile = 'لا يوجد';
+  static const String engineUnknownValue = '--';
   static const String localModelSettingsTitle = 'إعدادات الموديل المحلي';
   static const String localModelSettingsDescription =
       'اختار موديل GGUF النشط وحدد إعدادات التشغيل قبل ربط Rust Engine.';

@@ -992,52 +992,106 @@ curl -s http://127.0.0.1:8787/memory/conversations | python3 -m json.tool
 
 ---
 
-## Post Step 10 Audit — README / did / Code Review + todo.md
+## Step 11 — Flutter Engine Client + Engine Status Sync
 
 ### الهدف
-تنفيذ مراجعة شاملة بعد Step 10 حسب الاتفاق:
-- مقارنة الكود الحالي مع `README.md` و`did.md`.
-- تحديد ما تم تنفيذه فعليًا.
-- تحديد ما هو مكتمل مبدئيًا.
-- تحديد ما هو Placeholder أو غير مربوط.
-- كتابة الخطوات الناقصة والمنظمة في `todo.md`.
+تنفيذ الخطوة التالية من `todo.md` بعد مراجعة ما بعد Step 10:
+- ربط Flutter بالـ Rust Engine قراءة حالة فقط.
+- عرض حالة الاتصال بالـ Engine في الواجهة بدون تغيير إعدادات الموديل.
+- تثبيت جسر أولي باستخدام `dio` قبل مزامنة الإعدادات في Step 12.
 
 ### مراجعة قبل التنفيذ
-- تمت مراجعة `README.md` باعتباره المرجع الأساسي.
+- تمت مراجعة `README.md` باعتباره المرجع العالي.
 - تمت مراجعة `did.md` الحالي قبل التنفيذ.
-- تمت مراجعة كود Flutter داخل `lib/`.
-- تمت مراجعة كود Rust داخل `logixa_engine/`.
+- تمت مراجعة `todo.md` باعتباره خريطة التنفيذ الحالية بعد المراجعة.
+- الخطوة متوافقة مع Step 11 في `todo.md`.
 - لم يتم تعديل `README.md`.
+- لم يتم تغيير منطق إعدادات الموديل المحلي الموجودة في Flutter.
 
 ### ما تم تنفيذه
-- إنشاء/تحديث ملف `todo.md` ليحتوي على:
-  - ملخص الحالة الحالية.
-  - مقارنة مباشرة مع خطوات `README.md`.
-  - تصنيف ما هو شغال فعليًا وما هو جزئي وما هو Placeholder.
-  - أهم الفجوات المعمارية الحالية.
-  - خطوات مقترحة بعد Step 10 بداية من Step 11.
-  - Cleanup items تحتاج قرار أو إذن لاحق.
-- توثيق أن ربط Flutter بالـ Rust Engine هو الفجوة الأساسية التالية قبل تشغيل الموديل الحقيقي.
-- توثيق أن Chat وData Center وTerminal وExtensions ما زالوا Placeholder/جزئيين.
-- توثيق أن Memory System موجود في Rust لكن غير مربوط بالواجهة أو الشات بعد.
+- إضافة موديل حالة للمحرك:
+  - `EngineStatusModel`
+- إضافة خدمة Flutter جديدة:
+  - `EngineClientService`
+- الخدمة تستخدم `dio` لقراءة endpoints التالية:
+  - `GET /health`
+  - `GET /status`
+  - `GET /settings`
+  - `GET /runtime/status`
+- تسجيل `EngineClientService` في `main.dart` كخدمة دائمة.
+- إضافة فحص أولي تلقائي عند تشغيل التطبيق.
+- إضافة تحديث دوري بسيط كل 10 ثوانٍ لحالة الـ Engine.
+- إضافة زر تحديث حالة Engine في TopBar.
+- تحديث Badge في TopBar لعرض:
+  - `Engine Online`
+  - `Engine Offline`
+  - `فحص المحرك`
+- إضافة سكشن جديد داخل Settings:
+  - `EngineStatusSection`
+- السكشن يعرض:
+  - حالة الاتصال.
+  - اسم الخدمة.
+  - الإصدار.
+  - Runtime stage.
+  - هل الموديل محمّل.
+  - هل الموديل المحلي مفعّل في Rust.
+  - البروفايل النشط من Rust.
+  - uptime.
+  - مسار config.
+  - مسار SQLite memory إن وجد.
+  - رسالة خطأ واضحة لو المحرك غير متصل.
 
 ### الملفات التي تم تعديلها
-- `todo.md`
+- `lib/main.dart`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/widgets/app_core/controller/top_bar_controller.dart`
+- `lib/app/widgets/app_core/view/sections/top_bar_title_section.dart`
+- `lib/app/widgets/app_core/view/sections/top_bar_actions_section.dart`
+- `lib/app/modules/settings/views/sections/local_model_settings_section.dart`
 - `did.md`
 
-### الملفات التي لم يتم تعديلها عمدًا
-- `README.md`
-- كود Flutter داخل `lib/`
-- كود Rust داخل `logixa_engine/`
+### الملفات التي تم إضافتها
+- `lib/app/data/models/engine_status_model.dart`
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/settings/views/sections/engine_status_section.dart`
 
-### ملاحظات المراجعة
-- النسخة المرفوعة لا تحتوي على `pubspec.yaml` أو `pubspec.lock` أو platform folders، لذلك فحص الباكدجات تم اعتمادًا على السياق السابق والملفات المتاحة فقط.
-- لم يتم تشغيل `flutter analyze` أو `cargo check` داخل بيئة المراجعة الحالية لأن أدوات Flutter/Rust غير متاحة هنا.
-- المراجعة لا تضيف Features جديدة؛ هي فقط تنظيم وتوثيق لما بعد Step 10.
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم مزامنة إعدادات Flutter إلى Rust؛ هذا مكانه Step 12.
+- لم يتم تشغيل GGUF فعليًا.
+- لم يتم ربط Chat بـ `/runtime/chat`.
+- لم يتم استخدام WebSocket أو streaming.
+- لم يتم جعل Flutter يبدأ Rust Engine تلقائيًا؛ المطلوب الآن قراءة الحالة فقط.
+- لم يتم تغيير إعدادات Model Profiles أو System Prompt الموجودة في Flutter.
 
-### الخطوة القادمة المقترحة حسب `todo.md`
-Step 11 — Flutter Engine Client + Engine Status Sync:
-- إنشاء خدمة Flutter للتواصل مع Rust Engine باستخدام `dio`.
-- قراءة `/health` و`/status` و`/settings` و`/runtime/status`.
-- عرض حالة الـ Engine في الواجهة بدون تشغيل GGUF.
+### أوامر الفحص المطلوبة
+```bash
+flutter pub get
+flutter analyze
+flutter run -d linux
+```
 
+مع تشغيل Rust Engine في Terminal منفصل:
+```bash
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+ثم فتح التطبيق والتأكد من ظهور حالة:
+```text
+Engine Online
+```
+
+ولو الـ Engine متوقف، المفروض تظهر حالة:
+```text
+Engine Offline
+```
+بدون كراش.
+
+### الخطوة القادمة حسب todo.md
+Step 12 — Sync Local Model Settings to Rust:
+- عند حفظ إعدادات الموديل من Flutter يتم إرسالها إلى `/runtime/profile`.
+- عند حفظ System Prompt يتم إرسالها إلى `/runtime/system-prompt`.
+- معالجة فشل الاتصال بدون كراش.

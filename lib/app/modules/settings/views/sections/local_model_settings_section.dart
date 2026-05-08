@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../constants/app_sizes.dart';
 import 'active_model_profile_form_section.dart';
+import 'engine_status_section.dart';
 import 'local_model_runtime_policy_section.dart';
 import 'model_profiles_section.dart';
 import 'settings_header_section.dart';
@@ -18,6 +19,8 @@ class LocalModelSettingsSection extends StatelessWidget {
       children: [
         const SettingsHeaderSection(),
         SizedBox(height: AppSizes.xxl.h),
+        const EngineStatusSection(),
+        SizedBox(height: AppSizes.xl.h),
         const LocalModelRuntimePolicySection(),
         SizedBox(height: AppSizes.xl.h),
         const SystemPromptSettingsSection(),

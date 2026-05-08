@@ -106,12 +106,30 @@ pub fn router(state: EngineState) -> Router {
         .route("/runtime/chat", post(runtime_chat))
         .route("/runtime/unload", post(runtime_unload))
         .route("/memory/status", get(memory_status))
-        .route("/memory/conversations", get(list_memory_conversations).post(create_memory_conversation))
-        .route("/memory/messages", get(list_memory_messages).post(create_memory_message))
-        .route("/memory/items", get(list_memory_items).post(create_memory_item))
-        .route("/memory/experts", get(list_memory_experts).post(upsert_memory_expert))
-        .route("/memory/workspace-sessions", get(list_memory_workspace_sessions).post(create_memory_workspace_session))
-        .route("/memory/selected-model-profile", get(memory_selected_model_profile))
+        .route(
+            "/memory/conversations",
+            get(list_memory_conversations).post(create_memory_conversation),
+        )
+        .route(
+            "/memory/messages",
+            get(list_memory_messages).post(create_memory_message),
+        )
+        .route(
+            "/memory/items",
+            get(list_memory_items).post(create_memory_item),
+        )
+        .route(
+            "/memory/experts",
+            get(list_memory_experts).post(upsert_memory_expert),
+        )
+        .route(
+            "/memory/workspace-sessions",
+            get(list_memory_workspace_sessions).post(create_memory_workspace_session),
+        )
+        .route(
+            "/memory/selected-model-profile",
+            get(memory_selected_model_profile),
+        )
         .with_state(state)
 }
 
@@ -153,7 +171,6 @@ async fn runtime_status(State(state): State<EngineState>) -> impl IntoResponse {
     Json(state.runtime.snapshot().await)
 }
 
-
 async fn set_runtime_system_prompt(
     State(state): State<EngineState>,
     Json(payload): Json<RuntimeSystemPromptRequest>,
@@ -174,9 +191,9 @@ async fn set_runtime_system_prompt(
         system_prompt_preview,
         message: match save_result {
             Ok(()) => "runtime system prompt saved".to_string(),
-            Err(error) => format!(
-                "runtime system prompt updated in memory but failed to save: {error}"
-            ),
+            Err(error) => {
+                format!("runtime system prompt updated in memory but failed to save: {error}")
+            }
         },
     })
 }
@@ -225,8 +242,12 @@ async fn set_runtime_profile(
             allow_background_model: config.allow_background_model,
             message: match (save_result, memory_result) {
                 (Ok(()), Ok(())) => "runtime model profile saved".to_string(),
-                (Err(error), _) => format!("runtime model profile updated in memory but failed to save config: {error}"),
-                (_, Err(error)) => format!("runtime model profile saved but failed to update memory snapshot: {error}"),
+                (Err(error), _) => format!(
+                    "runtime model profile updated in memory but failed to save config: {error}"
+                ),
+                (_, Err(error)) => format!(
+                    "runtime model profile saved but failed to update memory snapshot: {error}"
+                ),
             },
         }
     };

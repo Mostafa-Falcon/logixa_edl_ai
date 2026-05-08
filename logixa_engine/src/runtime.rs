@@ -1,6 +1,12 @@
-use crate::{config::{normalize_system_prompt, EngineConfig}, model_profile::ModelProfileConfig};
+use crate::{
+    config::{normalize_system_prompt, EngineConfig},
+    model_profile::ModelProfileConfig,
+};
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,9 +179,14 @@ impl RuntimeManager {
         };
 
         if !profile.has_model_path() {
-            let message = "active model profile has no model_path; no model was started".to_string();
-            self.mark_error(message.clone(), Some(profile.id.clone()), Some(&resolved_system_prompt))
-                .await;
+            let message =
+                "active model profile has no model_path; no model was started".to_string();
+            self.mark_error(
+                message.clone(),
+                Some(profile.id.clone()),
+                Some(&resolved_system_prompt),
+            )
+            .await;
 
             return self.response(
                 false,
@@ -196,8 +207,12 @@ impl RuntimeManager {
         let should_unload = config.unload_after_response || !config.keep_model_loaded;
         let final_model_loaded = !should_unload && config.allow_background_model;
 
-        self.mark_completed(Some(profile.id.clone()), final_model_loaded, &resolved_system_prompt)
-            .await;
+        self.mark_completed(
+            Some(profile.id.clone()),
+            final_model_loaded,
+            &resolved_system_prompt,
+        )
+        .await;
 
         self.response(
             true,
@@ -261,7 +276,12 @@ impl RuntimeManager {
         state.last_system_prompt_preview = Some(preview_text(system_prompt, 120));
     }
 
-    async fn mark_completed(&self, profile_id: Option<String>, model_loaded: bool, system_prompt: &str) {
+    async fn mark_completed(
+        &self,
+        profile_id: Option<String>,
+        model_loaded: bool,
+        system_prompt: &str,
+    ) {
         let mut state = self.state.write().await;
         state.stage = RuntimeStage::Completed;
         state.model_loaded = model_loaded;
@@ -276,7 +296,12 @@ impl RuntimeManager {
         state.last_system_prompt_preview = Some(preview_text(system_prompt, 120));
     }
 
-    async fn mark_error(&self, error: String, profile_id: Option<String>, system_prompt: Option<&str>) {
+    async fn mark_error(
+        &self,
+        error: String,
+        profile_id: Option<String>,
+        system_prompt: Option<&str>,
+    ) {
         let mut state = self.state.write().await;
         state.stage = RuntimeStage::Error;
         state.model_loaded = false;

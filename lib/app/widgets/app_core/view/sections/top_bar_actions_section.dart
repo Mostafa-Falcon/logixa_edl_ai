@@ -40,6 +40,17 @@ class TopBarActionsSection extends GetView<TopBarController> {
               onPressed: controller.toggleLocalModelMode,
             ),
           ),
+          Obx(() {
+            final isOnline = controller.engineClientService.engineStatus.value.isOnline;
+            final isChecking = controller.engineClientService.engineStatus.value.isChecking;
+
+            return _TopBarActionButton(
+              tooltip: AppStrings.refreshEngineStatusTooltip,
+              icon: isChecking ? Icons.sync_rounded : Icons.cloud_sync_rounded,
+              active: isOnline,
+              onPressed: controller.refreshEngineStatus,
+            );
+          }),
           _TopBarActionButton(
             tooltip: AppStrings.settingsTooltip,
             icon: Icons.tune_rounded,
