@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'engine_http_core.dart';
+import 'engine_status_client.dart';
 
 import '../models/engine_status_model.dart';
 import '../models/memory_dashboard_model.dart';
@@ -38,7 +39,6 @@ class EngineSyncResult {
       message: _asString(data['message'], fallback: 'تمت مزامنة Rust Engine.'),
     );
   }
-
   static bool _asBool(dynamic value, {required bool fallback}) {
     if (value is bool) return value;
     if (value is String) {
@@ -212,19 +212,8 @@ class EngineRuntimeChatResult {
     return fallback;
   }
 
-  static String? _asNullableString(dynamic value) {
-    if (value is String && value.trim().isNotEmpty) return value.trim();
-    return null;
-  }
-
-  static int? _asNullableInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value.trim());
-    return null;
-  }
-
   static bool? _asNullableBool(dynamic value) {
+    if (value == null) return null;
     if (value is bool) return value;
     if (value is String) {
       final normalized = value.trim().toLowerCase();
@@ -236,6 +225,19 @@ class EngineRuntimeChatResult {
 
   static bool _asBool(dynamic value, {required bool fallback}) {
     return _asNullableBool(value) ?? fallback;
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  static int? _asNullableInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }
 
@@ -768,54 +770,11 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
       engineStatus.value = engineStatus.value.copyWith(isChecking: true);
     }
 
-    try {
-      final responses = await Future.wait([
-        _dio.get<Map<String, dynamic>>('/health'),
-        _dio.get<Map<String, dynamic>>('/status'),
-        _dio.get<Map<String, dynamic>>('/settings'),
-        _dio.get<Map<String, dynamic>>('/runtime/status'),
-      ]);
-
-      final health = _asMap(responses[0].data);
-      final status = _asMap(responses[1].data);
-      final settings = _asMap(responses[2].data);
-      final runtime = _asMap(responses[3].data);
-
-      engineStatus.value = EngineStatusModel(
-        isOnline: _asBool(health['ok'], fallback: true),
-        isChecking: false,
-        service: _asString(health['service'], fallback: 'logixa_engine'),
-        version: _asString(health['version'], fallback: '-'),
-        statusMessage: 'Rust Engine متصل',
-        errorMessage: null,
-        configPath: _asNullableString(
-          status['config_path'] ?? health['config_path'],
-        ),
-        memoryDbPath: _asNullableString(status['memory_db_path']),
-        uptimeSeconds: _asNullableInt(status['uptime_seconds']),
-        engineRunning: _asBool(status['engine_running'], fallback: true),
-        localModelEnabled: _asBool(
-          status['local_model_enabled'] ?? settings['local_model_enabled'],
-          fallback: false,
-        ),
-        modelLoaded: _asBool(
-          runtime['model_loaded'] ?? status['model_loaded'],
-          fallback: false,
-        ),
-        runtimeStage: _asString(runtime['stage'], fallback: 'unknown'),
-        activeModelProfileId: _asNullableString(
-          runtime['active_model_profile_id'] ??
-              status['active_model_profile_id'] ??
-              settings['active_model_profile_id'],
-        ),
-      );
-    } catch (error) {
-      engineStatus.value = EngineStatusModel.initial().copyWith(
-        isChecking: false,
-        statusMessage: 'Rust Engine غير متصل',
-        errorMessage: _friendlyError(error),
-      );
-    }
+    final statusClient = EngineStatusClient(
+      dio: _dio,
+      defaultBaseUrl: defaultBaseUrl,
+    );
+    engineStatus.value = await statusClient.fetchStatus();
   }
 
   Future<EngineSyncResult> syncRuntimeProfile({

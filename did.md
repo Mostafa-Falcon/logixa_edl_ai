@@ -3097,3 +3097,42 @@ flutter run -d linux
 
 ### الخطوة القادمة
 `Step 25.3 — Extract Engine Process Client` أو خطوة تقسيم صغيرة تالية حسب المراجعة.
+
+---
+
+## Step 25.3 — Extract Engine Status Client
+
+### الهدف
+استكمال `Step 25 — Codebase Hygiene Pass` بفصل قراءة حالة Rust Engine من `EngineClientService` في client متخصص، بدون تغيير سلوك التطبيق.
+
+### ما تم تنفيذه
+- إضافة `EngineStatusClient` مسؤول فقط عن قراءة:
+  - `/health`
+  - `/status`
+  - `/settings`
+  - `/runtime/status`
+- إبقاء `EngineClientService` كـ facade عام لباقي التطبيق.
+- جعل `refreshEngineStatus()` يفوض بناء `EngineStatusModel` إلى `EngineStatusClient`.
+- حذف helper functions القديمة من `EngineClientService` بعد نقل مسؤوليتها إلى `EngineStatusClient`.
+- إصلاح كسر محلي حصل أثناء محاولة حذف helpers يدويًا قبل commit.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/services/engine_client_service.dart`
+- `did.md`
+
+### الملفات التي تم إضافتها
+- `lib/app/data/services/engine_status_client.dart`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل Rust.
+- لم يتم فصل runtime chat أو memory clients بعد.
+- لم يتم تغيير أي Feature أو UI.
+
+### الفحوص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### الخطوة القادمة
+`Step 25.4 — Extract Runtime Chat Client` أو مراجعة تأثير التقسيم قبل الاستمرار.
