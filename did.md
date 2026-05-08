@@ -3031,3 +3031,37 @@ flutter run -d linux
 git diff -- README.md todo.md did.md
 git status --short
 ```
+
+---
+
+## Step 25.1 — Engine Client Split Review
+
+### الهدف
+بدء `Step 25 — Codebase Hygiene Pass` بمراجعة آمنة لملف `EngineClientService` قبل أي تقسيم فعلي.
+
+### ما تم تنفيذه
+- إضافة وثيقة مراجعة تحدد مسؤوليات `EngineClientService` الحالية.
+- تحديد خطة تقسيم تدريجية بدون تغيير سلوك التطبيق.
+- تثبيت أن `EngineClientService` سيظل facade في البداية حتى لا تنكسر الاستدعاءات الحالية.
+- تحديد الخطوة التنفيذية التالية: `Step 25.2 — Extract Engine HTTP Core`.
+
+### الملفات التي تم تعديلها
+- `did.md`
+
+### الملفات التي تم إضافتها
+- `docs/step25_1_engine_client_split_review.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل أي كود Dart.
+- لم يتم تعديل أي كود Rust.
+- لم يتم تغيير endpoints أو runtime behavior.
+- لم يتم تنفيذ أي Feature جديدة.
+
+### الفحوص المطلوبة
+```bash
+git diff -- docs/step25_1_engine_client_split_review.md did.md
+git status --short
+```
+
+### الخطوة القادمة
+`Step 25.2 — Extract Engine HTTP Core` مع الحفاظ على السلوك الحالي بالكامل.
