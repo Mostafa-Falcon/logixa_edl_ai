@@ -1264,3 +1264,103 @@ flutter analyze
 ### الخطوة القادمة حسب todo.md
 Step 13 — Local Model Profiles Presets:
 - إضافة Action لإنشاء بروفايلات Gemma 4B Fast وGemma 12B Quality بدون تشغيل موديل حقيقي.
+
+---
+
+## Step 13 — Local Model Profiles Presets
+
+### الهدف
+تنفيذ الخطوة التالية من `todo.md` بدون تعديل `README.md`:
+- إضافة بروفايلات جاهزة للموديلات الموجودة محليًا.
+- تجهيز بروفايل سريع لـ Gemma 3 4B.
+- تجهيز بروفايل جودة أعلى لـ Gemma 3 12B.
+- عدم تشغيل GGUF فعليًا في هذه الخطوة.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع العالي.
+- تمت مراجعة `did.md` كسجل تنفيذ.
+- تمت مراجعة `todo.md` باعتباره خريطة التنفيذ الحالية.
+- الخطوة متوافقة مع Step 13 في `todo.md`.
+- لم يتم تعديل `README.md`.
+
+### ما تم تنفيذه
+- إضافة preset ثابت داخل `ModelProfileModel` لـ:
+  - `Gemma 3 4B Fast`
+  - `Gemma 3 12B Quality`
+- إضافة مسارات نسبية للموديلات الحالية داخل المشروع:
+  - `models/gemma3_abliterated_v2/gemma-3-4b-it-abliterated-v2.q4_k_m.gguf`
+  - `models/gemma3_abliterated_v2/gemma-3-12b-it-abliterated-v2.q4_k_m.gguf`
+- تثبيت إعدادات sampling الأساسية داخل البروفايلات الجاهزة:
+  - `temperature = 1.0`
+  - `top_p = 0.95`
+  - `top_k = 64`
+  - `repeat_penalty = 1.10`
+  - `presence_penalty = 0.10`
+- تثبيت Prompt Template المناسب لـ Gemma:
+  - `<start_of_turn>user\n{system_prompt}\n\n{user_prompt}<end_of_turn>\n<start_of_turn>model`
+- جعل بروفايل 4B بدور:
+  - `model_role = fast`
+  - `batch_size = 256`
+  - `max_tokens = 512`
+- جعل بروفايل 12B بدور:
+  - `model_role = quality`
+  - `batch_size = 128`
+  - `max_tokens = 768`
+- إضافة أزرار داخل قسم بروفايلات الموديلات:
+  - إضافة Gemma 4B سريع.
+  - إضافة Gemma 12B جودة.
+- عند اختيار preset:
+  - يتم حفظه كبروفايل نشط داخل Flutter.
+  - يتم تحديث الفورم بنفس القيم.
+  - يتم محاولة مزامنته مع Rust Engine عبر `/runtime/profile`.
+  - لو Rust Engine غير متصل، يتم الحفظ محليًا فقط بدون كراش.
+- استخدام نفس `ReusableButton` والتصميم الموحد بدون إنشاء UI منفصل.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/models/model_profile_model.dart`
+- `lib/app/modules/settings/controllers/settings_controller.dart`
+- `lib/app/modules/settings/views/sections/model_profiles_section.dart`
+- `lib/app/constants/app_strings.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تشغيل GGUF فعليًا.
+- لم يتم تنفيذ `llama.cpp` adapter.
+- لم يتم تنفيذ Runtime Model Router.
+- لم يتم تغيير Memory System.
+- لم يتم إضافة import/export Markdown.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter pub get
+flutter analyze
+flutter run -d linux
+```
+
+مع تشغيل Rust Engine في Terminal منفصل أو باستخدام `scripts/dev.sh`:
+
+```bash
+cd logixa_engine
+cargo fmt
+cargo check
+cargo run
+```
+
+اختبار يدوي مقترح:
+- افتح Settings.
+- اضغط `إضافة Gemma 4B سريع`.
+- افحص أن البروفايل ظهر وأصبح نشطًا.
+- اضغط `إضافة Gemma 12B جودة`.
+- افحص أن البروفايل ظهر وأصبح نشطًا.
+- مع تشغيل Rust، افحص:
+
+```bash
+curl -s http://127.0.0.1:8787/settings | python3 -m json.tool
+```
+
+### الخطوة القادمة حسب todo.md
+Step 14 — Real Chat Page Skeleton:
+- استبدال ChatPage placeholder بشاشة شات مبدئية.
+- إرسال prompt إلى `/runtime/chat`.
+- عرض response lifecycle message مؤقتًا بدون تشغيل GGUF فعلي.

@@ -24,9 +24,9 @@ class ModelProfilesSection extends GetView<SettingsController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -40,11 +40,30 @@ class ModelProfilesSection extends GetView<SettingsController> {
                   ],
                 ),
               ),
+            ],
+          ),
+          SizedBox(height: AppSizes.lg.h),
+          Wrap(
+            spacing: AppSizes.sm.w,
+            runSpacing: AppSizes.sm.h,
+            children: [
               ReusableButton(
                 title: AppStrings.addModelProfileButton,
                 icon: Icons.add_rounded,
                 variant: ReusableButtonVariant.secondary,
                 onPressed: controller.createModelProfile,
+              ),
+              ReusableButton(
+                title: AppStrings.addGemma4bPresetButton,
+                icon: Icons.flash_on_rounded,
+                variant: ReusableButtonVariant.primary,
+                onPressed: controller.createGemma4bFastPreset,
+              ),
+              ReusableButton(
+                title: AppStrings.addGemma12bPresetButton,
+                icon: Icons.psychology_alt_rounded,
+                variant: ReusableButtonVariant.secondary,
+                onPressed: controller.createGemma12bQualityPreset,
               ),
             ],
           ),

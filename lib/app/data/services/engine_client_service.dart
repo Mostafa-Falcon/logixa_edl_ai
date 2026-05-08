@@ -4,6 +4,52 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
 import '../models/engine_status_model.dart';
+import '../models/model_profile_model.dart';
+
+class EngineSyncResult {
+  final bool engineOnline;
+  final bool saved;
+  final String message;
+
+  const EngineSyncResult({
+    required this.engineOnline,
+    required this.saved,
+    required this.message,
+  });
+
+  bool get fullySynced => engineOnline && saved;
+
+  factory EngineSyncResult.offline(String message) {
+    return EngineSyncResult(
+      engineOnline: false,
+      saved: false,
+      message: message,
+    );
+  }
+
+  factory EngineSyncResult.fromResponse(Map<String, dynamic> data) {
+    return EngineSyncResult(
+      engineOnline: true,
+      saved: _asBool(data['saved'], fallback: true),
+      message: _asString(data['message'], fallback: 'تمت مزامنة Rust Engine.'),
+    );
+  }
+
+  static bool _asBool(dynamic value, {required bool fallback}) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true') return true;
+      if (normalized == 'false') return false;
+    }
+    return fallback;
+  }
+
+  static String _asString(dynamic value, {required String fallback}) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return fallback;
+  }
+}
 
 class EngineClientService extends GetxService {
   static const String defaultBaseUrl = 'http://127.0.0.1:8787';
@@ -91,6 +137,48 @@ class EngineClientService extends GetxService {
         statusMessage: 'Rust Engine غير متصل',
         errorMessage: _friendlyError(error),
       );
+    }
+  }
+
+  Future<EngineSyncResult> syncRuntimeProfile({
+    required ModelProfileModel profile,
+    required bool localModelEnabled,
+    required bool autoStartOnMessage,
+    required bool allowBackgroundModel,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/runtime/profile',
+        data: {
+          'local_model_enabled': localModelEnabled,
+          'auto_start_on_message': autoStartOnMessage,
+          'keep_model_loaded': profile.keepModelLoaded,
+          'unload_after_response': profile.unloadAfterResponse,
+          'allow_background_model': allowBackgroundModel,
+          'model_profile': profile.toJson(),
+        },
+      );
+
+      await refreshEngineStatus(silent: true);
+      return EngineSyncResult.fromResponse(_asMap(response.data));
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineSyncResult.offline(_friendlyError(error));
+    }
+  }
+
+  Future<EngineSyncResult> syncSystemPrompt(String systemPrompt) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/runtime/system-prompt',
+        data: {'system_prompt': systemPrompt},
+      );
+
+      await refreshEngineStatus(silent: true);
+      return EngineSyncResult.fromResponse(_asMap(response.data));
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineSyncResult.offline(_friendlyError(error));
     }
   }
 

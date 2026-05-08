@@ -101,6 +101,33 @@ class ActiveModelProfileFormSection extends GetView<SettingsController> {
                   controller: controller.topKController,
                   keyboardType: TextInputType.number,
                 ),
+                ReusableSettingsTextField(
+                  label: AppStrings.repeatPenaltyLabel,
+                  hint: '1.10',
+                  controller: controller.repeatPenaltyController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                ReusableSettingsTextField(
+                  label: AppStrings.presencePenaltyLabel,
+                  hint: '0.10',
+                  controller: controller.presencePenaltyController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                ReusableSettingsTextField(
+                  label: AppStrings.modelRoleLabel,
+                  hint: 'fast / quality / coding',
+                  controller: controller.modelRoleController,
+                ),
+                ReusableSettingsTextField(
+                  label: AppStrings.loadPolicyLabel,
+                  hint: 'on_demand',
+                  controller: controller.loadPolicyController,
+                ),
+                ReusableSettingsTextField(
+                  label: AppStrings.ramPolicyLabel,
+                  hint: 'conservative',
+                  controller: controller.ramPolicyController,
+                ),
               ];
 
               if (!useTwoColumns) {
@@ -126,6 +153,13 @@ class ActiveModelProfileFormSection extends GetView<SettingsController> {
                 ],
               );
             },
+          ),
+          SizedBox(height: AppSizes.md.h),
+          ReusableSettingsTextField(
+            label: AppStrings.promptTemplateLabel,
+            hint: AppStrings.promptTemplateHint,
+            controller: controller.promptTemplateController,
+            maxLines: 4,
           ),
           SizedBox(height: AppSizes.xl.h),
           Obx(

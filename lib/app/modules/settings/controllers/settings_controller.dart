@@ -9,9 +9,11 @@ import 'package:uuid/uuid.dart';
 import '../../../constants/app_strings.dart';
 import '../../../data/models/model_profile_model.dart';
 import '../../../data/services/app_settings_service.dart';
+import '../../../data/services/engine_client_service.dart';
 
 class SettingsController extends GetxController {
   final AppSettingsService settingsService = Get.find<AppSettingsService>();
+  final EngineClientService engineClientService = Get.find<EngineClientService>();
 
   final selectedSectionIndex = 2.obs;
   final isPickingModel = false.obs;
@@ -26,6 +28,12 @@ class SettingsController extends GetxController {
   final TextEditingController temperatureController = TextEditingController();
   final TextEditingController topPController = TextEditingController();
   final TextEditingController topKController = TextEditingController();
+  final TextEditingController repeatPenaltyController = TextEditingController();
+  final TextEditingController presencePenaltyController = TextEditingController();
+  final TextEditingController promptTemplateController = TextEditingController();
+  final TextEditingController modelRoleController = TextEditingController();
+  final TextEditingController loadPolicyController = TextEditingController();
+  final TextEditingController ramPolicyController = TextEditingController();
   final TextEditingController systemPromptController = TextEditingController();
 
   final Uuid _uuid = const Uuid();
@@ -48,6 +56,12 @@ class SettingsController extends GetxController {
     temperatureController.dispose();
     topPController.dispose();
     topKController.dispose();
+    repeatPenaltyController.dispose();
+    presencePenaltyController.dispose();
+    promptTemplateController.dispose();
+    modelRoleController.dispose();
+    loadPolicyController.dispose();
+    ramPolicyController.dispose();
     systemPromptController.dispose();
     super.onClose();
   }
@@ -63,6 +77,48 @@ class SettingsController extends GetxController {
     await settingsService.addModelProfile(newProfile);
     _syncControllersFromProfile(newProfile);
     _showSuccess(AppStrings.modelProfileCreated);
+  }
+
+  Future<void> createGemma4bFastPreset() async {
+    await _savePresetProfile(
+      ModelProfileModel.gemma4bFast(),
+      AppStrings.gemma4bPresetCreated,
+      AppStrings.gemma4bPresetCreatedLocallyOnly,
+    );
+  }
+
+  Future<void> createGemma12bQualityPreset() async {
+    await _savePresetProfile(
+      ModelProfileModel.gemma12bQuality(),
+      AppStrings.gemma12bPresetCreated,
+      AppStrings.gemma12bPresetCreatedLocallyOnly,
+    );
+  }
+
+  Future<void> _savePresetProfile(
+    ModelProfileModel preset,
+    String syncedMessage,
+    String localOnlyMessage,
+  ) async {
+    if (isSaving.value) return;
+
+    isSaving.value = true;
+    try {
+      final activePreset = preset.copyWith(isActive: true);
+      await settingsService.saveActiveModelProfile(activePreset);
+      _syncControllersFromProfile(settingsService.activeModelProfile.value);
+
+      final syncResult = await engineClientService.syncRuntimeProfile(
+        profile: settingsService.activeModelProfile.value,
+        localModelEnabled: settingsService.localModelEnabled.value,
+        autoStartOnMessage: settingsService.autoStartOnMessage.value,
+        allowBackgroundModel: settingsService.allowBackgroundModel.value,
+      );
+
+      _showSyncResult(syncResult, syncedMessage, localOnlyMessage);
+    } finally {
+      isSaving.value = false;
+    }
   }
 
   Future<void> selectModelProfile(String profileId) async {
@@ -155,8 +211,16 @@ class SettingsController extends GetxController {
       await settingsService.setSystemPrompt(systemPromptController.text);
       systemPromptController.text = settingsService.systemPrompt.value;
 
+      final syncResult = await engineClientService.syncSystemPrompt(
+        settingsService.systemPrompt.value,
+      );
+
       if (showSuccessMessage) {
-        _showSuccess(AppStrings.systemPromptSaved);
+        _showSyncResult(
+          syncResult,
+          AppStrings.systemPromptSyncedToRust,
+          AppStrings.systemPromptSavedLocallyOnly,
+        );
       }
     } finally {
       isSaving.value = false;
@@ -166,7 +230,16 @@ class SettingsController extends GetxController {
   Future<void> resetSystemPrompt() async {
     await settingsService.resetSystemPrompt();
     systemPromptController.text = settingsService.systemPrompt.value;
-    _showSuccess(AppStrings.systemPromptReset);
+
+    final syncResult = await engineClientService.syncSystemPrompt(
+      settingsService.systemPrompt.value,
+    );
+
+    _showSyncResult(
+      syncResult,
+      AppStrings.systemPromptResetAndSyncedToRust,
+      AppStrings.systemPromptResetLocallyOnly,
+    );
   }
 
   Future<void> saveLocalModelSettings({bool showSuccessMessage = true}) async {
@@ -205,13 +278,43 @@ class SettingsController extends GetxController {
         ),
         topP: _safeDouble(topPController.text, current.topP, min: 0.01, max: 1),
         topK: _safeInt(topKController.text, current.topK, min: 1),
+        repeatPenalty: _safeDouble(
+          repeatPenaltyController.text,
+          current.repeatPenalty,
+          min: 0,
+          max: 3,
+        ),
+        presencePenalty: _safeDouble(
+          presencePenaltyController.text,
+          current.presencePenalty,
+          min: 0,
+          max: 2,
+        ),
+        promptTemplate: _safeText(
+          promptTemplateController.text,
+          current.promptTemplate,
+        ),
+        modelRole: _safeText(modelRoleController.text, current.modelRole),
+        loadPolicy: _safeText(loadPolicyController.text, current.loadPolicy),
+        ramPolicy: _safeText(ramPolicyController.text, current.ramPolicy),
         isActive: true,
       );
 
       await settingsService.saveActiveModelProfile(profile);
 
+      final syncResult = await engineClientService.syncRuntimeProfile(
+        profile: settingsService.activeModelProfile.value,
+        localModelEnabled: settingsService.localModelEnabled.value,
+        autoStartOnMessage: settingsService.autoStartOnMessage.value,
+        allowBackgroundModel: settingsService.allowBackgroundModel.value,
+      );
+
       if (showSuccessMessage) {
-        _showSuccess(AppStrings.localModelSettingsSaved);
+        _showSyncResult(
+          syncResult,
+          AppStrings.localModelSettingsSyncedToRust,
+          AppStrings.localModelSettingsSavedLocallyOnly,
+        );
       }
     } finally {
       isSaving.value = false;
@@ -228,6 +331,12 @@ class SettingsController extends GetxController {
     temperatureController.text = profile.temperature.toString();
     topPController.text = profile.topP.toString();
     topKController.text = profile.topK.toString();
+    repeatPenaltyController.text = profile.repeatPenalty.toString();
+    presencePenaltyController.text = profile.presencePenalty.toString();
+    promptTemplateController.text = profile.promptTemplate;
+    modelRoleController.text = profile.modelRole;
+    loadPolicyController.text = profile.loadPolicy;
+    ramPolicyController.text = profile.ramPolicy;
   }
 
   void _showSuccess(String message) {
@@ -246,6 +355,19 @@ class SettingsController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(14),
     );
+  }
+
+  void _showSyncResult(
+    EngineSyncResult syncResult,
+    String syncedMessage,
+    String localOnlyMessage,
+  ) {
+    if (syncResult.fullySynced) {
+      _showSuccess(syncedMessage);
+      return;
+    }
+
+    _showError('$localOnlyMessage\n${syncResult.message}');
   }
 
   String _safeText(String value, String fallback) {

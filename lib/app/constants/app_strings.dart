@@ -180,6 +180,10 @@ class AppStrings {
   static const String saveSettingsButton = 'حفظ الإعدادات';
   static const String localModelSettingsSaved =
       'تم حفظ إعدادات الموديل المحلي.';
+  static const String localModelSettingsSyncedToRust =
+      'تم حفظ إعدادات الموديل ومزامنتها مع Rust Engine.';
+  static const String localModelSettingsSavedLocallyOnly =
+      'تم حفظ إعدادات الموديل محليًا فقط، وتعذرت مزامنتها مع Rust Engine.';
 
   static const String systemPromptTitle = 'السيستم برومبت';
   static const String systemPromptDescription =
@@ -190,12 +194,22 @@ class AppStrings {
   static const String saveSystemPromptButton = 'حفظ السيستم برومبت';
   static const String resetSystemPromptButton = 'استعادة الافتراضي';
   static const String systemPromptSaved = 'تم حفظ السيستم برومبت.';
+  static const String systemPromptSyncedToRust =
+      'تم حفظ السيستم برومبت ومزامنته مع Rust Engine.';
+  static const String systemPromptSavedLocallyOnly =
+      'تم حفظ السيستم برومبت محليًا فقط، وتعذرت مزامنته مع Rust Engine.';
   static const String systemPromptReset = 'تمت استعادة السيستم برومبت الافتراضي.';
+  static const String systemPromptResetAndSyncedToRust =
+      'تمت استعادة السيستم برومبت الافتراضي ومزامنته مع Rust Engine.';
+  static const String systemPromptResetLocallyOnly =
+      'تمت استعادة السيستم برومبت محليًا فقط، وتعذرت مزامنته مع Rust Engine.';
 
   static const String modelProfilesTitle = 'بروفايلات الموديلات';
   static const String modelProfilesDescription =
       'جهز أكتر من إعداد موديل، واختار بروفايل نشط وقت التشغيل لاحقًا.';
   static const String addModelProfileButton = 'إضافة بروفايل';
+  static const String addGemma4bPresetButton = 'إضافة Gemma 4B سريع';
+  static const String addGemma12bPresetButton = 'إضافة Gemma 12B جودة';
   static const String newModelProfileName = 'بروفايل موديل';
   static const String activeProfileBadge = 'نشط';
   static const String setActiveProfileButton = 'تعيين كنشط';
@@ -203,12 +217,28 @@ class AppStrings {
   static const String deleteProfileButton = 'حذف';
   static const String noModelFileSelected = 'لم يتم اختيار ملف موديل بعد';
   static const String modelProfileCreated = 'تم إنشاء بروفايل موديل جديد.';
+  static const String gemma4bPresetCreated =
+      'تم تجهيز بروفايل Gemma 3 4B Fast ومزامنته مع Rust Engine.';
+  static const String gemma4bPresetCreatedLocallyOnly =
+      'تم تجهيز بروفايل Gemma 3 4B Fast محليًا فقط، وتعذرت مزامنته مع Rust Engine.';
+  static const String gemma12bPresetCreated =
+      'تم تجهيز بروفايل Gemma 3 12B Quality ومزامنته مع Rust Engine.';
+  static const String gemma12bPresetCreatedLocallyOnly =
+      'تم تجهيز بروفايل Gemma 3 12B Quality محليًا فقط، وتعذرت مزامنته مع Rust Engine.';
   static const String modelProfileSelected = 'تم تعيين بروفايل الموديل كنشط.';
   static const String modelProfileDeleted = 'تم حذف بروفايل الموديل.';
   static const String cannotDeleteLastModelProfile =
       'لا يمكن حذف آخر بروفايل؛ لازم يفضل بروفايل واحد على الأقل.';
 
   static const String topKLabel = 'Top K';
+  static const String repeatPenaltyLabel = 'Repeat Penalty';
+  static const String presencePenaltyLabel = 'Presence Penalty';
+  static const String promptTemplateLabel = 'Prompt Template';
+  static const String promptTemplateHint =
+      '<start_of_turn>user\n{system_prompt}\n\n{user_prompt}<end_of_turn>\n<start_of_turn>model';
+  static const String modelRoleLabel = 'Model Role';
+  static const String loadPolicyLabel = 'Load Policy';
+  static const String ramPolicyLabel = 'RAM Policy';
 
   static const String workspaceBottomPanelTerminal = 'Terminal';
   static const String workspaceBottomPanelLogs = 'Logs';
