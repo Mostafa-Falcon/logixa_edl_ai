@@ -3065,3 +3065,35 @@ git status --short
 
 ### الخطوة القادمة
 `Step 25.2 — Extract Engine HTTP Core` مع الحفاظ على السلوك الحالي بالكامل.
+
+---
+
+## Step 25.2 Fix — Integrate Engine HTTP Core
+
+### الهدف
+تصحيح Step 25.2 بعد أن تم إضافة `engine_http_core.dart` بدون ربطه فعليًا داخل `EngineClientService`.
+
+### ما تم تنفيذه
+- ربط `EngineClientService` بـ `EngineHttpCore`.
+- نقل إنشاء `Dio(BaseOptions...)` إلى `EngineHttpCore.createDio()`.
+- الحفاظ على `EngineClientService` كـ facade عام لباقي التطبيق.
+- عدم تغيير endpoints أو timeouts أو runtime behavior.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/data/services/engine_http_core.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل Rust.
+- لم يتم تقسيم runtime/chat/memory clients في هذه الخطوة.
+- لم يتم إضافة Feature جديدة.
+
+### الفحوص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### الخطوة القادمة
+`Step 25.3 — Extract Engine Process Client` أو خطوة تقسيم صغيرة تالية حسب المراجعة.

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
+import 'engine_http_core.dart';
 
 import '../models/engine_status_model.dart';
 import '../models/memory_dashboard_model.dart';
@@ -542,15 +543,7 @@ class EngineClientService extends GetxService {
   @override
   void onInit() {
     super.onInit();
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: defaultBaseUrl,
-        connectTimeout: const Duration(milliseconds: 900),
-        receiveTimeout: const Duration(milliseconds: 1200),
-        sendTimeout: const Duration(milliseconds: 1200),
-        responseType: ResponseType.json,
-      ),
-    );
+    _dio = const EngineHttpCore(baseUrl: defaultBaseUrl).createDio();
 
     refreshEngineStatus(silent: true);
     _statusTimer = Timer.periodic(_refreshInterval, (_) {
