@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
 import '../models/engine_status_model.dart';
+import '../models/memory_dashboard_model.dart';
 import '../models/model_profile_model.dart';
 
 class EngineSyncResult {
@@ -679,6 +680,98 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
     }
   }
 
+  Future<EngineMemoryDashboardResult> fetchMemoryDashboard({
+    String? preferredConversationId,
+  }) async {
+    try {
+      final statusResponse = await _dio.get<Map<String, dynamic>>(
+        '/memory/status',
+      );
+      final conversationsResponse = await _dio.get<Map<String, dynamic>>(
+        '/memory/conversations',
+      );
+      final itemsResponse = await _dio.get<Map<String, dynamic>>(
+        '/memory/items',
+      );
+      final expertsResponse = await _dio.get<Map<String, dynamic>>(
+        '/memory/experts',
+      );
+      final workspaceSessionsResponse = await _dio.get<Map<String, dynamic>>(
+        '/memory/workspace-sessions',
+      );
+      final selectedProfileResponse = await _dio.get<Map<String, dynamic>>(
+        '/memory/selected-model-profile',
+      );
+
+      final conversations = _extractDataList(
+        conversationsResponse.data,
+      ).map(MemoryConversationSummary.fromJson).toList(growable: false);
+
+      final conversationId = _resolveConversationId(
+        preferredConversationId,
+        conversations,
+      );
+      final messages = conversationId == null
+          ? <MemoryMessageSummary>[]
+          : await _fetchConversationMessages(conversationId);
+
+      final snapshot = MemoryDashboardSnapshot(
+        status: MemoryStatusSummary.fromJson(
+          _extractDataMap(statusResponse.data),
+        ),
+        conversations: conversations,
+        messages: messages,
+        memoryItems: _extractDataList(
+          itemsResponse.data,
+        ).map(MemoryItemSummary.fromJson).toList(growable: false),
+        experts: _extractDataList(
+          expertsResponse.data,
+        ).map(MemoryExpertSummary.fromJson).toList(growable: false),
+        workspaceSessions: _extractDataList(
+          workspaceSessionsResponse.data,
+        ).map(MemoryWorkspaceSessionSummary.fromJson).toList(growable: false),
+        selectedModelProfile: SelectedModelProfileSnapshot.fromJson(
+          _extractDataMap(selectedProfileResponse.data),
+        ),
+      );
+
+      await refreshEngineStatus(silent: true);
+      return EngineMemoryDashboardResult.success(snapshot);
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineMemoryDashboardResult.failed(_friendlyError(error));
+    }
+  }
+
+  Future<List<MemoryMessageSummary>> _fetchConversationMessages(
+    String conversationId,
+  ) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/memory/messages',
+      queryParameters: {'conversation_id': conversationId},
+    );
+
+    return _extractDataList(
+      response.data,
+    ).map(MemoryMessageSummary.fromJson).toList(growable: false);
+  }
+
+  String? _resolveConversationId(
+    String? preferredConversationId,
+    List<MemoryConversationSummary> conversations,
+  ) {
+    if (conversations.isEmpty) return null;
+
+    final preferred = preferredConversationId?.trim();
+    if (preferred != null && preferred.isNotEmpty) {
+      for (final conversation in conversations) {
+        if (conversation.id == preferred) return preferred;
+      }
+    }
+
+    return conversations.first.id;
+  }
+
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
@@ -710,6 +803,25 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
       if (normalized == 'false') return false;
     }
     return fallback;
+  }
+
+  Map<String, dynamic> _extractDataMap(dynamic value) {
+    final root = _asMap(value);
+    final data = root['data'];
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _extractDataList(dynamic value) {
+    final root = _asMap(value);
+    final data = root['data'];
+    if (data is! List) return const [];
+
+    return data
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
   }
 
   String _friendlyError(Object error) {

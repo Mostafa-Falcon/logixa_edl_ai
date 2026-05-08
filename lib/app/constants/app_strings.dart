@@ -88,6 +88,34 @@ class AppStrings {
   static const String dataCenterComingSoon =
       'مركز البيانات هيشتغل بعد تثبيت طبقة الذاكرة المحلية.';
 
+  static const String dataCenterPageTitle = 'مركز البيانات';
+  static const String dataCenterPageSubtitle =
+      'عرض ذاكرة Rust: المحادثات، الرسائل، العناصر، الخبراء، ومساحات العمل.';
+  static const String dataCenterRefreshButton = 'تحديث الذاكرة';
+  static const String dataCenterEngineRequired =
+      'شغّل Rust Engine من الشريط العلوي ثم اضغط تحديث الذاكرة.';
+  static const String dataCenterLoadFailed = 'تعذر تحميل Rust Memory.';
+  static const String memoryConversationsTitle = 'المحادثات';
+  static const String memoryMessagesTitle = 'رسائل المحادثة';
+  static const String memoryOverviewTitle = 'نظرة عامة على الذاكرة';
+  static const String memorySnapshotTitle = 'Snapshot البروفايل النشط';
+  static const String memorySideDataTitle = 'بيانات إضافية';
+  static const String memoryDbPathLabel = 'قاعدة الذاكرة';
+  static const String memoryConversationsLabel = 'Conversations';
+  static const String memoryMessagesLabel = 'Messages';
+  static const String memoryItemsLabel = 'Memory Items';
+  static const String memoryExpertsLabel = 'Experts';
+  static const String memoryWorkspaceSessionsLabel = 'Workspace Sessions';
+  static const String memorySelectedProfileLabel = 'Selected Profile';
+  static const String memoryNoConversations = 'لا توجد محادثات محفوظة بعد.';
+  static const String memoryNoMessages = 'اختار محادثة لعرض الرسائل.';
+  static const String memoryNoMemoryItems = 'لا توجد memory items بعد.';
+  static const String memoryNoExperts = 'لا يوجد خبراء محفوظين بعد.';
+  static const String memoryNoWorkspaceSessions =
+      'لا توجد workspace sessions محفوظة بعد.';
+  static const String memoryProfileSnapshotEmpty =
+      'لم يتم حفظ Snapshot لبروفايل موديل في Rust Memory بعد.';
+
   static const String showLess = 'عرض أقل';
   static const String deleteWorkspace = 'إزالة مساحة العمل';
   static const String deleteWorkspaceConfirmation =

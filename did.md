@@ -1803,3 +1803,96 @@ curl -s http://127.0.0.1:8787/memory/status
 
 ### الحالة
 Step 15 جاهزة للفحص والاعتماد بعد نجاح الاختبار اليدوي.
+
+---
+
+## Step 16 — Data Center / Memory UI
+
+### الهدف
+تنفيذ Step 16 من `todo.md` فقط:
+- تشغيل زر مركز البيانات بدل Placeholder.
+- إنشاء صفحة Memory / Data Center تعرض محتوى Rust Memory.
+- استخدام Rust Memory endpoints الحالية بدون تغيير Rust Engine وبدون تشغيل GGUF.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع الأعلى ولم يتم تعديله.
+- تمت مراجعة `did.md` لمعرفة آخر نقطة مستقرة: Step 15.
+- تمت مراجعة `todo.md` وتحديد نطاق Step 16 فقط.
+
+### ما تم تنفيذه
+- إضافة صفحة جديدة:
+  - `/data-center`
+- إضافة Module مستقل:
+  - `DataCenterBinding`
+  - `DataCenterController`
+  - `DataCenterView`
+- ربط زر مركز البيانات من Home Quick Actions بالصفحة الجديدة بدل رسالة Placeholder.
+- إضافة زر مركز البيانات إلى الـ navigation الموحد في `AppMainNavigation`.
+- إضافة موديلات قراءة خفيفة لبيانات Rust Memory:
+  - status summary
+  - conversations
+  - messages
+  - memory items
+  - experts
+  - workspace sessions
+  - selected model profile snapshot
+- توسيع `EngineClientService` لقراءة endpoints التالية:
+  - `GET /memory/status`
+  - `GET /memory/conversations`
+  - `GET /memory/messages?conversation_id=...`
+  - `GET /memory/items`
+  - `GET /memory/experts`
+  - `GET /memory/workspace-sessions`
+  - `GET /memory/selected-model-profile`
+- عرض Counters أساسية للذاكرة.
+- عرض قائمة المحادثات المحفوظة.
+- عرض رسائل المحادثة المختارة.
+- عرض Snapshot للبروفايل النشط، وقاعدة الذاكرة، وملخص العناصر/الخبراء/مساحات العمل.
+- الحفاظ على نفس `CorePage` والـ Navigation الموحد والستايل العام.
+
+### الملفات التي تم تعديلها
+- `did.md`
+- `lib/app/constants/app_strings.dart`
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/home/controllers/home_controller.dart`
+- `lib/app/routes/app_pages.dart`
+- `lib/app/routes/app_routes.dart`
+- `lib/app/widgets/app_core/view/sections/app_main_navigation.dart`
+
+### الملفات التي تم إضافتها
+- `lib/app/data/models/memory_dashboard_model.dart`
+- `lib/app/modules/data_center/bindings/data_center_binding.dart`
+- `lib/app/modules/data_center/controllers/data_center_controller.dart`
+- `lib/app/modules/data_center/views/data_center_view.dart`
+- `lib/app/modules/data_center/views/sections/data_center_header_section.dart`
+- `lib/app/modules/data_center/views/sections/data_center_overview_section.dart`
+- `lib/app/modules/data_center/views/sections/data_center_content_section.dart`
+- `lib/app/modules/data_center/views/sections/data_center_conversations_section.dart`
+- `lib/app/modules/data_center/views/sections/data_center_messages_section.dart`
+- `lib/app/modules/data_center/views/sections/data_center_snapshot_section.dart`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تشغيل GGUF.
+- لم يتم إضافة Streaming.
+- لم يتم إضافة Tools.
+- لم يتم تسجيل Workspace Sessions؛ هذا مؤجل لـ Step 17.
+- لم يتم إنشاء Memory Items أو Experts من Flutter؛ هذه الصفحة تعرض الموجود فقط.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار Step 16
+1. شغّل Rust Engine من الشريط العلوي.
+2. افتح مركز البيانات من Quick Actions أو الـ Sidebar.
+3. اضغط `تحديث الذاكرة`.
+4. تأكد أن counters تظهر.
+5. تأكد أن المحادثات المحفوظة من Step 15 تظهر.
+6. اختار محادثة وتأكد أن رسائلها تظهر.
+
+### الخطوة القادمة حسب `todo.md`
+Step 17 — Workspace Sessions Sync.

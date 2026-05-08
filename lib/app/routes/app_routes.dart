@@ -7,6 +7,7 @@ abstract class Routes {
   static const home = _Paths.home;
   static const workSpace = _Paths.workSpace;
   static const chatPage = _Paths.chatPage;
+  static const dataCenter = _Paths.dataCenter;
   static const settings = _Paths.settings;
 }
 
@@ -16,5 +17,6 @@ abstract class _Paths {
   static const home = '/home';
   static const workSpace = '/work-space';
   static const chatPage = '/chat-page';
+  static const dataCenter = '/data-center';
   static const settings = '/settings';
 }

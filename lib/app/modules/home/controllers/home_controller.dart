@@ -61,6 +61,11 @@ class HomeController extends GetxController {
       return;
     }
 
+    if (selectedItem.label == AppStrings.navData) {
+      Get.toNamed(Routes.dataCenter);
+      return;
+    }
+
     if (selectedItem.label == AppStrings.navSettings) {
       Get.toNamed(Routes.settings);
     }
@@ -78,7 +83,7 @@ class HomeController extends GetxController {
         Get.toNamed(Routes.settings);
         break;
       case QuickActionType.dataCenter:
-        _showComingSoon(AppStrings.dataCenter, AppStrings.dataCenterComingSoon);
+        Get.toNamed(Routes.dataCenter);
         break;
     }
   }
@@ -440,17 +445,6 @@ class HomeController extends GetxController {
       message,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: AppColors.errorSoft,
-      colorText: AppColors.textPrimary,
-      margin: const EdgeInsets.all(16),
-    );
-  }
-
-  void _showComingSoon(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.infoSoft,
       colorText: AppColors.textPrimary,
       margin: const EdgeInsets.all(16),
     );

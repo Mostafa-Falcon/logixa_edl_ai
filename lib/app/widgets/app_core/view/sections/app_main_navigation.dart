@@ -32,6 +32,12 @@ class AppMainNavigation extends StatelessWidget {
           isActive: _isActive(currentRoute, Routes.chatPage),
           onTap: () => _goTo(Routes.chatPage),
         ),
+        AppActivityBarItem(
+          tooltip: AppStrings.navData,
+          icon: Icons.hub_rounded,
+          isActive: _isActive(currentRoute, Routes.dataCenter),
+          onTap: () => _goTo(Routes.dataCenter),
+        ),
       ],
       bottomItems: [
         AppActivityBarItem(
