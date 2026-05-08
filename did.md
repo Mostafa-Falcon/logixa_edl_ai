@@ -1896,3 +1896,165 @@ flutter run -d linux
 
 ### الخطوة القادمة حسب `todo.md`
 Step 17 — Workspace Sessions Sync.
+
+---
+
+## Step 17 — Workspace Sessions Sync
+
+### الهدف
+ربط صفحة مساحة العمل بـ Rust Memory حتى يتم تسجيل جلسة Workspace عند فتح مساحة عمل، وتحديثها/إضافة جلسة جديدة عند فتح ملف أو تغيير الملف النشط.
+
+### ما تم تنفيذه
+- إضافة method في `EngineClientService` لإرسال جلسات مساحة العمل إلى:
+  - `POST /memory/workspace-sessions`
+- إضافة result model مبسط لنتيجة حفظ جلسة Workspace.
+- مزامنة Workspace عند:
+  - تحميل مساحة العمل.
+  - تحديث مساحة العمل.
+  - فتح ملف.
+  - تغيير التبويب النشط.
+  - إغلاق التبويب النشط.
+- إرسال metadata مفيدة مع الجلسة:
+  - `event`
+  - `opened_file_count`
+  - `opened_files`
+  - `workspace_file_count`
+  - حالة side/bottom panels
+- تحديث عرض Data Center ليُظهر معلومات أوضح عن workspace sessions:
+  - مسار Workspace.
+  - الملف النشط.
+  - عدد الملفات المفتوحة.
+
+### الملفات المعدلة
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/work_space/controllers/work_space_controller.dart`
+- `lib/app/data/models/memory_dashboard_model.dart`
+- `lib/app/modules/data_center/views/sections/data_center_snapshot_section.dart`
+- `lib/app/constants/app_strings.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Terminal حقيقي.
+- لم يتم تنفيذ Context Menu.
+- لم يتم تعديل Rust Engine schema؛ تم استخدام endpoint الموجود بالفعل.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب
+- شغّل Rust Engine من الشريط العلوي.
+- افتح Workspace.
+- افتح ملف من Explorer.
+- افتح مركز البيانات.
+- اضغط تحديث الذاكرة.
+- تأكد أن `Workspace Sessions` زادت وظهر آخر workspace/active file.
+
+### الحالة
+بانتظار فحص مصطفى ونتيجة `flutter analyze` وصورة Data Center قبل اعتماد Step 17.
+
+---
+
+## Fix Step — Step 17 Data Center Snapshot Build Error
+
+### الهدف
+إصلاح أخطاء `flutter analyze` و `flutter run -d linux` التي ظهرت بعد تطبيق Step 17 فقط، بدون إضافة Feature جديدة وبدون تعديل `README.md` أو `todo.md`.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع الأعلى.
+- تمت مراجعة `did.md` لمعرفة آخر نقطة: Step 17 — Workspace Sessions Sync.
+- تمت مراجعة `todo.md` للتأكد أن الإصلاح داخل نطاق Step 17 وليس خطوة جديدة.
+
+### سبب المشكلة
+كان ملف `data_center_snapshot_section.dart` يحتوي على string متعددة السطور مكتوبة داخل single quotes، مما سبب:
+- `Unterminated string literal`
+- أخطاء parser متتابعة داخل `_InfoBlock`
+- تحذيرات وهمية عن variables غير مستخدمة بسبب فشل التحليل قبل اكتمال قراءة الكود.
+
+### ما تم تنفيذه
+- استبدال الـ multiline single-quoted string بقائمة سطور واضحة يتم تجميعها بواسطة `join('\n')`.
+- تمرير قيمة جاهزة باسم `sessionDetails` إلى `_InfoBlock.value`.
+- الحفاظ على نفس عرض معلومات Workspace Session:
+  - مسار Workspace.
+  - الملف النشط أو رسالة عدم وجود ملف نشط.
+  - عدد الملفات المفتوحة.
+
+### الملفات التي تم تعديلها
+- `lib/app/modules/data_center/views/sections/data_center_snapshot_section.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تغيير `EngineClientService`.
+- لم يتم تغيير `WorkSpaceController`.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Terminal أو Context Menu.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### الحالة
+هذا إصلاح مباشر لكسر البناء في Step 17. بعد نجاح الفحص، يتم اعتماد Step 17 ثم عمل commit/tag.
+
+---
+
+## Step 17 QA Cleanup — Workspace Code Style Unification
+
+### الهدف
+تنظيف ملاحظات ما بعد فحص Step 17 بدون توسيع السكوب:
+- نقل رسائل Workspace الظاهرة للمستخدم من `WorkSpaceController` إلى `AppStrings`.
+- توحيد fallback اسم Workspace في Data Center عبر `AppStrings` بدل hardcoded string.
+- تحويل مفاتيح metadata وأسماء أحداث Workspace Sessions إلى private constants بدل strings متناثرة داخل الدوال.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` كمرجع أعلى ولم يتم تعديله.
+- تمت مراجعة `did.md` لمعرفة آخر حالة: Step 17 مع نجاح الفحص اليدوي بعد fix.
+- تمت مراجعة `todo.md` والتأكد أن هذا تنظيف داخل حدود Step 17 وليس Step جديدة وظيفيًا.
+
+### ما تم تنفيذه
+- إضافة strings جديدة في `AppStrings` لرسائل Workspace logs/errors/preview/fallback.
+- تحديث `WorkSpaceController` لاستخدام `AppStrings` لكل الرسائل الظاهرة للمستخدم.
+- إضافة private constants داخل `WorkSpaceController` لأحداث Workspace Session وmetadata keys.
+- تحديث `DataCenterSnapshotSection` لاستخدام `AppStrings.memoryWorkspaceFallbackName`.
+- تحديث `MemoryWorkspaceSessionSummary` لاستخدام private constants عند قراءة metadata.
+- الحفاظ على نفس endpoint ونفس schema ونفس سلوك Step 17.
+
+### الملفات المعدلة
+- `lib/app/constants/app_strings.dart`
+- `lib/app/modules/work_space/controllers/work_space_controller.dart`
+- `lib/app/modules/data_center/views/sections/data_center_snapshot_section.dart`
+- `lib/app/data/models/memory_dashboard_model.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تعديل Rust Engine schema.
+- لم يتم إضافة Package جديد.
+- لم يتم تغيير تصميم الواجهة أو إضافة Features جديدة.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب
+- افتح Workspace.
+- افتح ملف.
+- افتح Data Center.
+- اضغط تحديث الذاكرة.
+- تأكد أن Workspace Sessions تظهر، وأن active file وعدد الملفات المفتوحة ظاهرين.
+
+### الحالة
+جاهزة للفحص. إذا نجح `flutter analyze` واشتغل التطبيق، يتم اعتماد Step 17 بالكامل ثم commit/tag.

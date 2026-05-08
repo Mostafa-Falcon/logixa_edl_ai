@@ -312,6 +312,70 @@ class EngineMemoryMessageResult {
   }
 }
 
+class EngineWorkspaceSessionResult {
+  final bool ok;
+  final String message;
+  final String? sessionId;
+
+  const EngineWorkspaceSessionResult({
+    required this.ok,
+    required this.message,
+    this.sessionId,
+  });
+
+  factory EngineWorkspaceSessionResult.failed(String message) {
+    return EngineWorkspaceSessionResult(ok: false, message: message);
+  }
+
+  factory EngineWorkspaceSessionResult.fromResponse(Map<String, dynamic> data) {
+    final ok = _asBool(data['ok'], fallback: true);
+    if (!ok) {
+      return EngineWorkspaceSessionResult.failed(
+        _asString(
+          data['error'],
+          fallback: 'فشل حفظ جلسة مساحة العمل في Rust Memory.',
+        ),
+      );
+    }
+
+    final payload = _asMap(data['data']);
+    final id = _asNullableString(payload['id']);
+    return EngineWorkspaceSessionResult(
+      ok: id != null,
+      sessionId: id,
+      message: id == null
+          ? 'Rust Memory لم يرجع workspace session id.'
+          : 'تم حفظ جلسة مساحة العمل في Rust Memory.',
+    );
+  }
+
+  static Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return <String, dynamic>{};
+  }
+
+  static String _asString(dynamic value, {required String fallback}) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return fallback;
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  static bool _asBool(dynamic value, {required bool fallback}) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true') return true;
+      if (normalized == 'false') return false;
+    }
+    return fallback;
+  }
+}
+
 class EngineClientService extends GetxService {
   static const String defaultBaseUrl = 'http://127.0.0.1:8787';
   static const Duration _refreshInterval = Duration(seconds: 10);
@@ -677,6 +741,31 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
     } catch (error) {
       await refreshEngineStatus(silent: true);
       return EngineMemoryMessageResult.failed(_friendlyError(error));
+    }
+  }
+
+  Future<EngineWorkspaceSessionResult> createMemoryWorkspaceSession({
+    required String workspacePath,
+    required String? workspaceName,
+    required String? activeFile,
+    required Map<String, dynamic> metadata,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/memory/workspace-sessions',
+        data: {
+          'workspace_path': workspacePath,
+          'workspace_name': workspaceName,
+          'active_file': activeFile,
+          'metadata': metadata,
+        },
+      );
+
+      await refreshEngineStatus(silent: true);
+      return EngineWorkspaceSessionResult.fromResponse(_asMap(response.data));
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineWorkspaceSessionResult.failed(_friendlyError(error));
     }
   }
 

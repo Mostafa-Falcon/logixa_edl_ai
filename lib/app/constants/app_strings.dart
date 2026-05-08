@@ -116,6 +116,35 @@ class AppStrings {
   static const String memoryProfileSnapshotEmpty =
       'لم يتم حفظ Snapshot لبروفايل موديل في Rust Memory بعد.';
 
+  static const String memoryWorkspaceActiveFileLabel = 'الملف النشط';
+  static const String memoryWorkspaceOpenedFilesLabel = 'الملفات المفتوحة';
+  static const String memoryWorkspaceNoActiveFile = 'لا يوجد ملف نشط محفوظ.';
+  static const String memoryWorkspaceFallbackName = 'Workspace';
+  static const String workspaceSessionSyncedToMemory =
+      'تمت مزامنة مساحة العمل مع Rust Memory.';
+  static const String workspaceSessionSyncFailed =
+      'تعذرت مزامنة مساحة العمل مع Rust Memory:';
+  static const String workspaceEngineClientNotReady =
+      'Rust Engine Client غير جاهز لمزامنة مساحة العمل.';
+  static const String workspaceLogsCleared = 'تم مسح لوجات مساحة العمل.';
+  static const String workspaceLargeFilePreviewBlocked =
+      'الملف كبير للمعاينة السريعة. افتحه لاحقًا في محرر كامل.';
+  static const String workspaceBinaryPreviewBlocked =
+      'الملف يبدو Binary أو غير نصي، لذلك المعاينة النصية متوقفة.';
+  static const String workspaceFileOpenedLogPrefix = 'تم فتح الملف:';
+  static const String workspaceFileOpenFailedPrefix = 'تعذر فتح الملف:';
+  static const String workspaceTabClosedLogPrefix = 'تم إغلاق تبويب:';
+  static const String workspaceNoActiveWorkspaceOpenFromHome =
+      'لا توجد مساحة عمل نشطة. افتح مشروع من الصفحة الرئيسية.';
+  static const String workspaceLoadedLogPrefix = 'تم تحميل مساحة العمل:';
+  static const String workspacePathMissing =
+      'مسار المشروع غير موجود على الجهاز.';
+  static const String workspaceProjectFilesReadPrefix = 'تم قراءة';
+  static const String workspaceProjectFilesReadSuffix =
+      'عنصر من ملفات المشروع.';
+  static const String workspaceProjectFilesReadFailedPrefix =
+      'تعذر قراءة ملفات المشروع:';
+
   static const String showLess = 'عرض أقل';
   static const String deleteWorkspace = 'إزالة مساحة العمل';
   static const String deleteWorkspaceConfirmation =

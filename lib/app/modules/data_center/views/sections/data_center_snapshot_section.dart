@@ -100,12 +100,25 @@ class DataCenterSnapshotSection extends GetView<DataCenterController> {
               );
             }),
             ...snapshot.workspaceSessions.take(4).map((session) {
+              final activeFile = session.activeFile;
+              final activeFileLabel = activeFile == null
+                  ? AppStrings.memoryWorkspaceNoActiveFile
+                  : '${AppStrings.memoryWorkspaceActiveFileLabel}: ${controller.compactPath(activeFile)}';
+              final openedCount = session.openedFileCount;
+              final sessionDetails = [
+                controller.compactPath(session.workspacePath),
+                activeFileLabel,
+                '${AppStrings.memoryWorkspaceOpenedFilesLabel}: $openedCount',
+              ].join('\n');
+
               return Padding(
                 padding: EdgeInsets.only(bottom: AppSizes.sm.h),
                 child: _InfoBlock(
                   icon: Icons.folder_copy_rounded,
-                  title: session.workspaceName ?? 'Workspace',
-                  value: controller.compactPath(session.workspacePath),
+                  title:
+                      session.workspaceName ??
+                      AppStrings.memoryWorkspaceFallbackName,
+                  value: sessionDetails,
                   color: AppColors.warning,
                 ),
               );

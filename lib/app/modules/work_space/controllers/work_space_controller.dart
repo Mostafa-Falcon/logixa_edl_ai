@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -6,9 +7,11 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:path/path.dart' as path;
 
+import '../../../constants/app_strings.dart';
 import '../../../data/models/opened_file_model.dart';
 import '../../../data/models/workspace_file_item_model.dart';
 import '../../../data/models/workspace_model.dart';
+import '../../../data/services/engine_client_service.dart';
 
 enum WorkSpaceSidePanel { explorer, extensions }
 
@@ -17,6 +20,24 @@ enum WorkSpaceBottomPanel { terminal, logs, problems, output }
 class WorkSpaceController extends GetxController {
   static const String _activeWorkspaceStorageKey = 'active_workspace';
   static const int _maxPreviewBytes = 512 * 1024;
+
+  static const String _eventWorkspaceRefreshed = 'workspace_refreshed';
+  static const String _eventWorkspaceLoaded = 'workspace_loaded';
+  static const String _eventFileOpened = 'file_opened';
+  static const String _eventActiveFileChanged = 'active_file_changed';
+  static const String _eventActiveFileCleared = 'active_file_cleared';
+  static const String _eventActiveFileChangedAfterClose =
+      'active_file_changed_after_close';
+
+  static const String _metadataEventKey = 'event';
+  static const String _metadataSourceKey = 'source';
+  static const String _metadataSourceFlutterWorkspace = 'flutter_workspace';
+  static const String _metadataOpenedFileCountKey = 'opened_file_count';
+  static const String _metadataOpenedFilesKey = 'opened_files';
+  static const String _metadataWorkspaceFileCountKey = 'workspace_file_count';
+  static const String _metadataSidePanelKey = 'side_panel';
+  static const String _metadataBottomPanelKey = 'bottom_panel';
+  static const String _metadataBottomPanelVisibleKey = 'bottom_panel_visible';
 
   final GetStorage _storage = GetStorage();
 
@@ -28,6 +49,8 @@ class WorkSpaceController extends GetxController {
   final openedFiles = <OpenedFileModel>[].obs;
   final workspaceLogs = <String>[].obs;
   final isBottomPanelVisible = true.obs;
+  final isSyncingWorkspaceSession = false.obs;
+  final lastWorkspaceSessionId = ''.obs;
 
   final isLoading = false.obs;
   final errorMessage = ''.obs;
@@ -101,6 +124,7 @@ class WorkSpaceController extends GetxController {
   Future<void> refreshWorkspace() async {
     final workspace = activeWorkspace.value;
     if (workspace == null) return;
+    await _syncWorkspaceSessionToMemory(event: _eventWorkspaceRefreshed);
     await _loadWorkspaceTree(workspace);
   }
 
@@ -119,7 +143,7 @@ class WorkSpaceController extends GetxController {
 
   void clearWorkspaceLogs() {
     workspaceLogs.clear();
-    _pushWorkspaceLog('تم مسح لوجات مساحة العمل.');
+    _pushWorkspaceLog(AppStrings.workspaceLogsCleared);
   }
 
   void toggleDirectory(WorkspaceFileItemModel item) {
@@ -179,9 +203,9 @@ class WorkSpaceController extends GetxController {
       late final String content;
 
       if (bytes.length > _maxPreviewBytes) {
-        content = 'الملف كبير للمعاينة السريعة. افتحه لاحقًا في محرر كامل.';
+        content = AppStrings.workspaceLargeFilePreviewBlocked;
       } else if (_looksBinary(bytes)) {
-        content = 'الملف يبدو Binary أو غير نصي، لذلك المعاينة النصية متوقفة.';
+        content = AppStrings.workspaceBinaryPreviewBlocked;
       } else {
         content = utf8.decode(bytes, allowMalformed: true);
       }
@@ -196,11 +220,17 @@ class WorkSpaceController extends GetxController {
 
       openedFiles.add(openedFile);
       _applyActiveFile(openedFile);
-      _pushWorkspaceLog('تم فتح الملف: $relativePath');
+      _pushWorkspaceLog(
+        '${AppStrings.workspaceFileOpenedLogPrefix} $relativePath',
+      );
+      await _syncWorkspaceSessionToMemory(
+        event: _eventFileOpened,
+        activeFile: relativePath,
+      );
     } catch (error) {
       openedFileContent.value = '';
-      errorMessage.value = 'تعذر فتح الملف: $error';
-      _pushWorkspaceLog('تعذر فتح الملف: $error');
+      errorMessage.value = '${AppStrings.workspaceFileOpenFailedPrefix} $error';
+      _pushWorkspaceLog('${AppStrings.workspaceFileOpenFailedPrefix} $error');
     }
   }
 
@@ -208,42 +238,116 @@ class WorkSpaceController extends GetxController {
     final file = openedFiles.firstWhereOrNull((item) => item.path == filePath);
     if (file == null) return;
     _applyActiveFile(file);
+    unawaited(
+      _syncWorkspaceSessionToMemory(
+        event: _eventActiveFileChanged,
+        activeFile: file.relativePath,
+      ),
+    );
   }
 
   void closeOpenedFile(String filePath) {
-    final closingIndex = openedFiles.indexWhere((file) => file.path == filePath);
+    final closingIndex = openedFiles.indexWhere(
+      (file) => file.path == filePath,
+    );
     if (closingIndex == -1) return;
 
     final wasActive = openedFilePath.value == filePath;
     final closedFile = openedFiles[closingIndex];
     openedFiles.removeAt(closingIndex);
-    _pushWorkspaceLog('تم إغلاق تبويب: ${closedFile.relativePath}');
+    _pushWorkspaceLog(
+      '${AppStrings.workspaceTabClosedLogPrefix} ${closedFile.relativePath}',
+    );
 
     if (!wasActive) return;
 
     if (openedFiles.isEmpty) {
       _clearActiveFile();
+      unawaited(_syncWorkspaceSessionToMemory(event: _eventActiveFileCleared));
       return;
     }
 
     final nextIndex = closingIndex >= openedFiles.length
         ? openedFiles.length - 1
         : closingIndex;
-    _applyActiveFile(openedFiles[nextIndex]);
+    final nextFile = openedFiles[nextIndex];
+    _applyActiveFile(nextFile);
+    unawaited(
+      _syncWorkspaceSessionToMemory(
+        event: _eventActiveFileChangedAfterClose,
+        activeFile: nextFile.relativePath,
+      ),
+    );
+  }
+
+  Future<void> _syncWorkspaceSessionToMemory({
+    required String event,
+    String? activeFile,
+  }) async {
+    final workspace = activeWorkspace.value;
+    if (workspace == null || isSyncingWorkspaceSession.value) return;
+
+    final engineClient = Get.isRegistered<EngineClientService>()
+        ? Get.find<EngineClientService>()
+        : null;
+    if (engineClient == null) {
+      _pushWorkspaceLog(AppStrings.workspaceEngineClientNotReady);
+      return;
+    }
+
+    final resolvedActiveFile = activeFile ?? activeOpenedFile?.relativePath;
+
+    isSyncingWorkspaceSession.value = true;
+    try {
+      final result = await engineClient.createMemoryWorkspaceSession(
+        workspacePath: workspace.path,
+        workspaceName: workspace.name,
+        activeFile: resolvedActiveFile,
+        metadata: {
+          _metadataEventKey: event,
+          _metadataSourceKey: _metadataSourceFlutterWorkspace,
+          _metadataOpenedFileCountKey: openedFiles.length,
+          _metadataOpenedFilesKey: openedFiles
+              .map((file) => file.relativePath)
+              .take(20)
+              .toList(growable: false),
+          _metadataWorkspaceFileCountKey: workspaceFiles.length,
+          _metadataSidePanelKey: activeSidePanel.value.name,
+          _metadataBottomPanelKey: activeBottomPanel.value.name,
+          _metadataBottomPanelVisibleKey: isBottomPanelVisible.value,
+        },
+      );
+
+      if (!result.ok) {
+        _pushWorkspaceLog(
+          '${AppStrings.workspaceSessionSyncFailed} ${result.message}',
+        );
+        return;
+      }
+
+      lastWorkspaceSessionId.value = result.sessionId ?? '';
+      _pushWorkspaceLog(AppStrings.workspaceSessionSyncedToMemory);
+    } catch (error) {
+      _pushWorkspaceLog('${AppStrings.workspaceSessionSyncFailed} $error');
+    } finally {
+      isSyncingWorkspaceSession.value = false;
+    }
   }
 
   Future<void> _loadActiveWorkspace() async {
     final workspace = _workspaceFromArguments() ?? _workspaceFromStorage();
 
     if (workspace == null) {
-      errorMessage.value =
-          'لا توجد مساحة عمل نشطة. افتح مشروع من الصفحة الرئيسية.';
+      errorMessage.value = AppStrings.workspaceNoActiveWorkspaceOpenFromHome;
       return;
     }
 
     activeWorkspace.value = workspace;
     _storage.write(_activeWorkspaceStorageKey, workspace.toJson());
-    _pushWorkspaceLog('تم تحميل مساحة العمل: ${workspace.name}');
+    _pushWorkspaceLog(
+      '${AppStrings.workspaceLoadedLogPrefix} ${workspace.name}',
+    );
+    await _syncWorkspaceSessionToMemory(event: _eventWorkspaceLoaded);
     await _loadWorkspaceTree(workspace);
   }
 
@@ -286,7 +390,7 @@ class WorkSpaceController extends GetxController {
       final rootDirectory = Directory(workspace.path);
       if (!await rootDirectory.exists()) {
         if (currentScan == _scanVersion) {
-          errorMessage.value = 'مسار المشروع غير موجود على الجهاز.';
+          errorMessage.value = AppStrings.workspacePathMissing;
         }
         return;
       }
@@ -301,12 +405,17 @@ class WorkSpaceController extends GetxController {
 
       workspaceFiles.assignAll(items);
       _seedExpandedDirectories(items);
-      _pushWorkspaceLog('تم قراءة ${items.length} عنصر من ملفات المشروع.');
+      _pushWorkspaceLog(
+        '${AppStrings.workspaceProjectFilesReadPrefix} ${items.length} ${AppStrings.workspaceProjectFilesReadSuffix}',
+      );
       await _openDefaultFileIfAvailable();
     } catch (error) {
       if (currentScan == _scanVersion) {
-        errorMessage.value = 'تعذر قراءة ملفات المشروع: $error';
-        _pushWorkspaceLog('تعذر قراءة ملفات المشروع: $error');
+        errorMessage.value =
+            '${AppStrings.workspaceProjectFilesReadFailedPrefix} $error';
+        _pushWorkspaceLog(
+          '${AppStrings.workspaceProjectFilesReadFailedPrefix} $error',
+        );
       }
     } finally {
       if (currentScan == _scanVersion) {
@@ -325,7 +434,8 @@ class WorkSpaceController extends GetxController {
           !item.relativePath.contains(path.separator),
     );
 
-    final readme = rootReadme ??
+    final readme =
+        rootReadme ??
         workspaceFiles.firstWhereOrNull(
           (item) => !item.isDirectory && item.name.toLowerCase() == 'readme.md',
         );
