@@ -247,7 +247,7 @@ class AppStrings {
   static const String chatPageSubtitle =
       'واجهة شات مبدئية. حالة Rust Engine وتشغيله من الشريط العلوي فقط.';
   static const String chatWelcomeMessage =
-      'الشات جاهز كبداية حقيقية. اكتب رسالة، وسيتم إرسالها إلى Rust /runtime/chat باستخدام البروفايل النشط من الإعدادات فقط، بدون تشغيل GGUF فعليًا في هذه الخطوة.';
+      'الشات جاهز كبداية حقيقية. اكتب رسالة، وسيتم إرسالها إلى Rust /runtime/chat باستخدام البروفايل النشط من الإعدادات فقط، وسيتم حفظ المحادثة تلقائيًا في Rust Memory بدون تشغيل GGUF فعليًا في هذه الخطوة.';
   static const String chatProfileSelectorTitle = 'اختيار بروفايل التشغيل';
   static const String chatProfileSelectorDescription =
       'استخدم البروفايل النشط أو اختار بروفايل يدويًا قبل إرسال الرسالة.';
@@ -260,6 +260,9 @@ class AppStrings {
   static const String chatInputHint = 'اكتب رسالتك هنا...';
   static const String chatSendButton = 'إرسال';
   static const String chatSendingStatus = 'جاري الإرسال';
+  static const String chatMemorySaveWarning =
+      'تنبيه: تعذر حفظ جزء من المحادثة في Rust Memory.';
+  static const String chatMemorySavedStatus = 'تم حفظ المحادثة في Rust Memory';
 
   static const String workspaceBottomPanelTerminal = 'Terminal';
   static const String workspaceBottomPanelLogs = 'Logs';

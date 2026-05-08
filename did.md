@@ -1734,3 +1734,72 @@ flutter run -d linux
 
 ### الحالة
 Step 14 ما زالت تحت الاعتماد النهائي. لا commit/tag إلا بعد نجاح الفحص اليدوي أعلاه.
+
+---
+
+## Step 15 — Auto-save Chat To Rust Memory
+
+### الهدف
+تحويل الشات من رسائل مؤقتة داخل Flutter فقط إلى شات يحفظ كل محادثة ورسائلها في Rust Memory / SQLite.
+
+### ما تم تنفيذه
+- عند أول رسالة في صفحة الشات يتم إنشاء conversation في Rust Memory عبر:
+  - `POST /memory/conversations`
+- حفظ رسالة المستخدم بعد إنشاء المحادثة عبر:
+  - `POST /memory/messages`
+- حفظ رد الـ runtime/assistant بعد استدعاء:
+  - `POST /runtime/chat`
+  ثم:
+  - `POST /memory/messages`
+- استخدام نفس conversation id لباقي رسائل نفس جلسة الشات المفتوحة.
+- إضافة metadata لكل رسالة محفوظة تشمل:
+  - `workspace_path`
+  - `active_model_profile_id`
+  - `system_prompt_preview`
+  - `runtime_stage`
+  - `client_message_id`
+  - `local_model_enabled`
+  - `auto_start_on_message`
+  - `allow_background_model`
+- إظهار system warning داخل الشات لو تعذر حفظ جزء من المحادثة في Rust Memory، بدون كسر إرسال الرسالة أو إيقاف الشات.
+- تحديث رسالة الترحيب في الشات لتوضيح أن الحفظ التلقائي في Rust Memory أصبح مفعّلًا.
+
+### الملفات التي تم تعديلها
+- `lib/app/data/services/engine_client_service.dart`
+- `lib/app/modules/chat_page/controllers/chat_page_controller.dart`
+- `lib/app/constants/app_strings.dart`
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+- لم يتم تنفيذ Data Center UI.
+- لم يتم عرض قائمة المحادثات أو الرسائل من الذاكرة؛ هذا مؤجل لـ Step 16.
+- لم يتم تشغيل GGUF الحقيقي.
+- لم يتم تنفيذ Streaming.
+- لم يتم تنفيذ Tools.
+- لم يتم تعديل Rust Engine لأن endpoints المطلوبة موجودة بالفعل.
+
+### أوامر الفحص المطلوبة
+```bash
+flutter analyze
+flutter run -d linux
+```
+
+### اختبار يدوي مطلوب قبل اعتماد Step 15
+1. شغّل Rust Engine من الشريط العلوي.
+2. افتح صفحة الشات.
+3. اكتب رسالة واحدة واضغط إرسال.
+4. تأكد أن رد الـ runtime ظهر عادي.
+5. تأكد أن الرسائل اتحفظت في Rust Memory بفحص العدادات:
+
+```bash
+curl -s http://127.0.0.1:8787/memory/status
+```
+
+المتوقع بعد أول رسالة:
+- `conversations` تزيد بمقدار 1.
+- `messages` تزيد بمقدار 2 على الأقل، رسالة user ورسالة assistant.
+
+### الحالة
+Step 15 جاهزة للفحص والاعتماد بعد نجاح الاختبار اليدوي.

@@ -187,6 +187,130 @@ class EngineProcessResult {
   }
 }
 
+class EngineMemoryConversationResult {
+  final bool ok;
+  final String message;
+  final String? conversationId;
+
+  const EngineMemoryConversationResult({
+    required this.ok,
+    required this.message,
+    this.conversationId,
+  });
+
+  factory EngineMemoryConversationResult.failed(String message) {
+    return EngineMemoryConversationResult(ok: false, message: message);
+  }
+
+  factory EngineMemoryConversationResult.fromResponse(
+    Map<String, dynamic> data,
+  ) {
+    final ok = _asBool(data['ok'], fallback: true);
+    if (!ok) {
+      return EngineMemoryConversationResult.failed(
+        _asString(data['error'], fallback: 'فشل إنشاء محادثة في Rust Memory.'),
+      );
+    }
+
+    final payload = _asMap(data['data']);
+    final id = _asNullableString(payload['id']);
+    return EngineMemoryConversationResult(
+      ok: id != null,
+      conversationId: id,
+      message: id == null
+          ? 'Rust Memory لم يرجع conversation id.'
+          : 'تم إنشاء محادثة في Rust Memory.',
+    );
+  }
+
+  static Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return <String, dynamic>{};
+  }
+
+  static String _asString(dynamic value, {required String fallback}) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return fallback;
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  static bool _asBool(dynamic value, {required bool fallback}) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true') return true;
+      if (normalized == 'false') return false;
+    }
+    return fallback;
+  }
+}
+
+class EngineMemoryMessageResult {
+  final bool ok;
+  final String message;
+  final String? messageId;
+
+  const EngineMemoryMessageResult({
+    required this.ok,
+    required this.message,
+    this.messageId,
+  });
+
+  factory EngineMemoryMessageResult.failed(String message) {
+    return EngineMemoryMessageResult(ok: false, message: message);
+  }
+
+  factory EngineMemoryMessageResult.fromResponse(Map<String, dynamic> data) {
+    final ok = _asBool(data['ok'], fallback: true);
+    if (!ok) {
+      return EngineMemoryMessageResult.failed(
+        _asString(data['error'], fallback: 'فشل حفظ رسالة في Rust Memory.'),
+      );
+    }
+
+    final payload = _asMap(data['data']);
+    final id = _asNullableString(payload['id']);
+    return EngineMemoryMessageResult(
+      ok: id != null,
+      messageId: id,
+      message: id == null
+          ? 'Rust Memory لم يرجع message id.'
+          : 'تم حفظ الرسالة في Rust Memory.',
+    );
+  }
+
+  static Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return <String, dynamic>{};
+  }
+
+  static String _asString(dynamic value, {required String fallback}) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return fallback;
+  }
+
+  static String? _asNullableString(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  static bool _asBool(dynamic value, {required bool fallback}) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true') return true;
+      if (normalized == 'false') return false;
+    }
+    return fallback;
+  }
+}
+
 class EngineClientService extends GetxService {
   static const String defaultBaseUrl = 'http://127.0.0.1:8787';
   static const Duration _refreshInterval = Duration(seconds: 10);
@@ -500,6 +624,58 @@ pkill -TERM -f 'target/debug/logixa_engine' >/dev/null 2>&1 || true
     } catch (error) {
       await refreshEngineStatus(silent: true);
       return EngineRuntimeChatResult.offline(_friendlyError(error));
+    }
+  }
+
+  Future<EngineMemoryConversationResult> createMemoryConversation({
+    required String title,
+    required String? workspacePath,
+    required String? modelProfileId,
+    required String systemPrompt,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/memory/conversations',
+        data: {
+          'title': title,
+          'workspace_path': workspacePath,
+          'model_profile_id': modelProfileId,
+          'system_prompt': systemPrompt,
+        },
+      );
+
+      await refreshEngineStatus(silent: true);
+      return EngineMemoryConversationResult.fromResponse(_asMap(response.data));
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineMemoryConversationResult.failed(_friendlyError(error));
+    }
+  }
+
+  Future<EngineMemoryMessageResult> createMemoryMessage({
+    required String conversationId,
+    required String role,
+    required String content,
+    required String? modelProfileId,
+    required Map<String, dynamic> metadata,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/memory/messages',
+        data: {
+          'conversation_id': conversationId,
+          'role': role,
+          'content': content,
+          'model_profile_id': modelProfileId,
+          'metadata': metadata,
+        },
+      );
+
+      await refreshEngineStatus(silent: true);
+      return EngineMemoryMessageResult.fromResponse(_asMap(response.data));
+    } catch (error) {
+      await refreshEngineStatus(silent: true);
+      return EngineMemoryMessageResult.failed(_friendlyError(error));
     }
   }
 
