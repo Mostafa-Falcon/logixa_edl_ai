@@ -2835,3 +2835,57 @@ flutter run -d linux
 
 ### الخطوة التالية
 إكمال Step 24 Router UI/Policy عند الحاجة: Manual Fast/Quality selection واضح، ثم Auto Router لاحقًا فقط.
+
+
+## Step 23 Fix — Streaming Compile Issues
+
+### الهدف
+إصلاح أخطاء بناء Step 23 Streaming فقط بدون توسيع النطاق.
+
+### ما تم
+- إصلاح decoding في Flutter stream بحيث يتم تحويل `Stream<Uint8List>` إلى `Stream<List<int>>` قبل `utf8.decoder`.
+- تفعيل feature `stream` في `reqwest` حتى يدعم `Response::bytes_stream()` داخل Rust runtime.
+
+### الملفات المتغيرة
+- `lib/app/data/services/engine_client_service.dart`
+- `logixa_engine/Cargo.toml`
+- `did.md`
+
+### الفحوصات المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo check`
+
+### ملاحظات
+- لا يوجد تغيير في prompt defaults.
+- لا يوجد تغيير في model router.
+- لا يوجد تغيير في Extensions.
+
+## Step 24 Fix — Runtime streaming scope repair
+
+### الهدف
+إصلاح كسر Rust في `runtime.rs` بعد محاولات فك منع الموديل، حيث كانت دالة streaming تستخدم متغيرات خارج نطاقها مثل `stopped_after_response`, `model_started`, و`generated_text`.
+
+### ما تم
+- إعادة بناء منطق `run_chat_stream` بالكامل داخل النطاق الصحيح.
+- توحيد validations الخاصة بالـ streaming مع `/runtime/chat`:
+  - `local_model_enabled`
+  - `auto_start_on_message`
+  - prompt فارغ
+  - model path مفقود
+  - model path لازم يكون absolute
+  - model file لازم يكون موجود
+  - `llama-server` لازم يكون موجود أو مضبوط عبر `LOGIXA_LLAMA_SERVER_BIN`
+- الحفاظ على `system_prompt_applied=false` عندما لا يوجد system prompt محفوظ.
+- عدم إضافة أي system prompt افتراضي.
+- عدم إعادة منع 12B؛ أي موديل يختاره المستخدم من Flutter هو مصدر التشغيل.
+
+### الملفات المتغيرة
+- `logixa_engine/src/runtime.rs`
+- `did.md`
+
+### الفحوصات المطلوبة
+- `flutter analyze`
+- `cd logixa_engine && cargo fmt && cargo check`
+
+### التالي
+بعد نجاح الفحص، يتم عمل commit للفكس فقط، ثم نكمل Step 24 الرسمية الخاصة بـ Runtime Model Router.

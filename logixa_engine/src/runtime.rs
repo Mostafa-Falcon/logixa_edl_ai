@@ -376,7 +376,7 @@ impl RuntimeManager {
         messages.push(json!({"role": "user", "content": user_prompt}));
 
         let body = json!({
-            "model": profile.id,
+            "model": profile.id.clone(),
             "stream": false,
             "max_tokens": profile.max_tokens,
             "temperature": profile.temperature,
@@ -487,6 +487,128 @@ impl RuntimeManager {
             send_stream_event(&sender, "error", json!(response)).await;
             return;
         }
+
+        if !Path::new(&profile.model_path).is_file() {
+            let response = self
+                .reject_for_profile(
+                    profile.id.clone(),
+                    format!("model_path_not_found: {}", profile.model_path),
+                )
+                .await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        if let Err(message) = validate_llama_server_bin() {
+            let response = self.reject_for_profile(profile.id.clone(), message).await;
+            send_stream_event(&sender, "error", json!(response)).await;
+            return;
+        }
+
+        let system_prompt = resolve_system_prompt(&config, payload.system_prompt);
+        let system_prompt_chars = system_prompt
+            .as_deref()
+            .map(|value| value.chars().count())
+            .unwrap_or_default();
+        let system_prompt_preview = system_prompt
+            .as_deref()
+            .map(|value| preview_text(value, 160))
+            .filter(|value| !value.is_empty());
+        let system_prompt_applied = system_prompt_chars > 0;
+
+        self.update_state(|state| {
+            state.stage = RuntimeStage::Starting;
+            state.model_loaded = false;
+            state.active_model_profile_id = Some(profile.id.clone());
+            state.total_requests = state.total_requests.saturating_add(1);
+            state.last_event = Some("starting_llama_server_stream".to_string());
+            state.last_error = None;
+            state.last_request_epoch_seconds = Some(now_epoch_seconds());
+            state.last_system_prompt_chars = system_prompt_chars;
+            state.last_system_prompt_preview = system_prompt_preview.clone();
+            state.server_url = Some(self.server_url.clone());
+        })
+        .await;
+
+        send_stream_event(
+            &sender,
+            "status",
+            json!({
+                "stage": "starting",
+                "active_model_profile_id": profile.id.clone(),
+                "server_url": self.server_url.clone(),
+            }),
+        )
+        .await;
+
+        let model_started = match self.ensure_llama_server_ready(&profile).await {
+            Ok(started) => started,
+            Err(message) => {
+                let response = self
+                    .fail(
+                        profile.id.clone(),
+                        message,
+                        system_prompt_applied,
+                        system_prompt_chars,
+                        system_prompt_preview.clone(),
+                    )
+                    .await;
+                send_stream_event(&sender, "error", json!(response)).await;
+                return;
+            }
+        };
+
+        self.update_state(|state| {
+            state.stage = RuntimeStage::Generating;
+            state.model_loaded = true;
+            state.active_model_profile_id = Some(profile.id.clone());
+            state.last_event = Some("stream_generating".to_string());
+            state.last_error = None;
+            state.server_url = Some(self.server_url.clone());
+        })
+        .await;
+
+        send_stream_event(
+            &sender,
+            "status",
+            json!({
+                "stage": "generating",
+                "active_model_profile_id": profile.id.clone(),
+                "model_started": model_started,
+                "system_prompt_applied": system_prompt_applied,
+                "system_prompt_chars": system_prompt_chars,
+                "system_prompt_preview": system_prompt_preview.clone(),
+                "server_url": self.server_url.clone(),
+            }),
+        )
+        .await;
+
+        let generated_text = match self
+            .send_chat_completion_stream(&profile, system_prompt.as_deref(), &prompt, &sender)
+            .await
+        {
+            Ok(text) => text,
+            Err(message) => {
+                let response = self
+                    .fail(
+                        profile.id.clone(),
+                        message,
+                        system_prompt_applied,
+                        system_prompt_chars,
+                        system_prompt_preview.clone(),
+                    )
+                    .await;
+                send_stream_event(&sender, "error", json!(response)).await;
+                return;
+            }
+        };
+
+        let mut stopped_after_response = false;
+        if config.unload_after_response && !config.keep_model_loaded {
+            stopped_after_response = true;
+            let _ = self.stop_llama_server().await;
+        }
+
         let snapshot = self
             .update_state(|state| {
                 state.stage = RuntimeStage::Completed;
@@ -537,7 +659,7 @@ impl RuntimeManager {
         messages.push(json!({"role": "user", "content": user_prompt}));
 
         let body = json!({
-            "model": profile.id,
+            "model": profile.id.clone(),
             "stream": true,
             "max_tokens": profile.max_tokens,
             "temperature": profile.temperature,
@@ -612,8 +734,8 @@ impl RuntimeManager {
                         json!({
                             "delta": delta,
                             "stage": "generating",
-                            "active_model_profile_id": profile.id,
-                            "server_url": self.server_url,
+                            "active_model_profile_id": profile.id.clone(),
+                            "server_url": self.server_url.clone(),
                         }),
                     )
                     .await;
