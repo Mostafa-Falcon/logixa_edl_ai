@@ -1205,3 +1205,62 @@ ram_policy
 ### الخطوة القادمة حسب todo.md
 Step 13 — Local Model Profiles Presets:
 - إضافة Action لإنشاء بروفايلات Gemma 4B Fast وGemma 12B Quality بدون تشغيل موديل حقيقي.
+
+---
+
+## Step 12.1 — Dev Run Script
+
+### الهدف
+إضافة سكريبت تطوير بسيط لتشغيل Rust Engine وFlutter معًا أثناء التطوير، بدون تحويل Flutter نفسه إلى Engine Process Manager داخل التطبيق في هذه المرحلة.
+
+### مراجعة قبل التنفيذ
+- تمت مراجعة `README.md` باعتباره المرجع العالي.
+- تمت مراجعة `did.md` كسجل تنفيذ.
+- تمت مراجعة `todo.md` كخريطة الطريق الحالية بعد المراجعة.
+- الخطوة متوافقة مع القرار الحالي: Dev Script الآن، وEngine Launcher لاحقًا بعد استقرار الربط.
+- لم يتم تعديل `README.md`.
+
+### ما تم تنفيذه
+- إضافة ملف:
+  - `scripts/dev.sh`
+- السكريبت يتحقق أولًا هل Rust Engine يعمل على:
+  - `http://127.0.0.1:8787/health`
+- إذا كان Engine يعمل بالفعل، يستخدمه بدون تشغيل نسخة ثانية.
+- إذا لم يكن يعمل، يشغّل:
+  - `cargo run`
+  داخل `logixa_engine/`.
+- ينتظر حتى يصبح Engine online قبل تشغيل Flutter.
+- يشغّل Flutter على Linux افتراضيًا.
+- عند إغلاق Flutter، يوقف Rust Engine فقط إذا كان السكريبت هو من شغّله.
+
+### الملفات التي تم إضافتها
+- `scripts/dev.sh`
+
+### الملفات التي تم تعديلها
+- `did.md`
+
+### ما لم يتم تنفيذه عمدًا
+- لم يتم تنفيذ Engine Launcher داخل Flutter.
+- لم يتم تغيير Rust Engine.
+- لم يتم تغيير إعدادات الموديل.
+- لم يتم تعديل `README.md`.
+- لم يتم تعديل `todo.md`.
+
+### أوامر الفحص المطلوبة
+```bash
+bash -n scripts/dev.sh
+flutter analyze
+./scripts/dev.sh
+```
+
+### نتيجة التنفيذ عند مصطفى
+- `flutter analyze` رجع:
+  - `No issues found!`
+- تم عمل commit:
+  - `e129e46 step 12.1 add dev run script`
+- تم رفع التاج:
+  - `step12-1-dev-run-script`
+
+### الخطوة القادمة حسب todo.md
+Step 13 — Local Model Profiles Presets:
+- إضافة Action لإنشاء بروفايلات Gemma 4B Fast وGemma 12B Quality بدون تشغيل موديل حقيقي.
